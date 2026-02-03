@@ -6,9 +6,16 @@ namespace HotelManager.DAL;
 
 public static class Db
 {
+    private static string? _connectionStringOverride;
+
+    public static void SetConnectionString(string connectionString)
+    {
+        _connectionStringOverride = connectionString;
+    }
+
     public static SqlConnection GetOpenConnection()
     {
-        var connectionString = ConfigurationManager.ConnectionStrings["HotelDb"]?.ConnectionString;
+        var connectionString = _connectionStringOverride ?? ConfigurationManager.ConnectionStrings["HotelDb"]?.ConnectionString;
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException("Missing connection string 'HotelDb'.");

@@ -1,0 +1,54 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+
+# Rider / JetBrains
+.idea/
+
+# Build outputs
+**/bin/
+**/obj/
+
+# NuGet packages
+**/packages/
+
+# Test results
+TestResults/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# SQL Server localdb
+*.mdf
+*.ldf
+
+# Publish
+**/publish/
+
+# Coverage
+coverage/
+*.coverage
+*.coveragexml
+
+# App config secrets
+appsettings*.json
+
+# User-specific
+*.userprefs
+
+# Temporary
+*.tmp
+*.temp
+
+# Docker
+*.env

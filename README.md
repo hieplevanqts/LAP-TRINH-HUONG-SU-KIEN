@@ -4,6 +4,7 @@
 - Phan tich nghiep vu: `docs/01_phan_tich_nghiep_vu.md`
 - Use case chinh: `docs/02_use_case.md`
 - Phan quyen: `docs/03_phan_quyen.md`
+- Huong dan cai dat Windows + SQL Server Docker: `docs/04_huong_dan_cai_dat_windows.md`
 - Script CSDL: `database/hotel_management.sql`
 - Source code: `src/`
 

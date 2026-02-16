@@ -27,7 +27,8 @@ public sealed class MainForm : Form
 
         Text = "Quản lý khách sạn";
         Width = 1200;
-        Height = 700;
+        Height = 860;
+        MinimumSize = new Size(1180, 800);
 
         var menu = BuildMenu();
         var tabs = BuildTabs();
@@ -183,7 +184,7 @@ public sealed class MainForm : Form
         _tabs = tabs;
 
         var bookingTab = new TabPage("Đặt phòng") { Padding = new Padding(10) };
-        _bookingsForm = new BookingsForm();
+        _bookingsForm = new BookingsForm(_loginInfo);
         _bookingsForm.BookingCreated += (_, _) => _paymentsForm?.RefreshData();
         EmbedForm(bookingTab, _bookingsForm);
 
@@ -201,7 +202,7 @@ public sealed class MainForm : Form
         EmbedForm(customerTab, _customersForm);
 
         var paymentTab = new TabPage("Thanh toán");
-        _paymentsForm = new PaymentsForm();
+        _paymentsForm = new PaymentsForm(_loginInfo);
         _paymentsForm.PaymentCompleted += (_, _) => RefreshAfterPayment();
         EmbedForm(paymentTab, _paymentsForm);
 
@@ -252,7 +253,10 @@ public sealed class MainForm : Form
     private void OpenSettings()
     {
         using var form = new SettingsForm();
-        form.ShowDialog(this);
+        if (form.ShowDialog(this) == DialogResult.OK)
+        {
+            _paymentsForm?.RefreshData();
+        }
     }
 
     private void RefreshAccountMenuAvatar()

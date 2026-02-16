@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Drawing;
 using System.Drawing.Printing;
 using Guna.UI2.WinForms;
@@ -15,6 +15,8 @@ public sealed class InvoiceDetailsForm : Form
     private readonly Label _lblCustomer = new();
     private readonly Label _lblContact = new();
     private readonly Label _lblDates = new();
+    private readonly Label _lblBookedBy = new();
+    private readonly Label _lblPaidBy = new();
     private readonly Label _lblMethod = new();
     private readonly Label _lblStatus = new();
     private readonly Label _lblSubtotal = new();
@@ -88,11 +90,17 @@ public sealed class InvoiceDetailsForm : Form
         panel.Controls.Add(new Label { Text = "Ngày ở", AutoSize = true }, 0, 3);
         panel.Controls.Add(_lblDates, 1, 3);
 
-        panel.Controls.Add(new Label { Text = "Thanh toán", AutoSize = true }, 0, 4);
-        panel.Controls.Add(_lblMethod, 1, 4);
+        panel.Controls.Add(new Label { Text = "Nhân viên đặt", AutoSize = true }, 0, 4);
+        panel.Controls.Add(_lblBookedBy, 1, 4);
 
-        panel.Controls.Add(new Label { Text = "Trạng thái", AutoSize = true }, 0, 5);
-        panel.Controls.Add(_lblStatus, 1, 5);
+        panel.Controls.Add(new Label { Text = "Nhân viên thu", AutoSize = true }, 0, 5);
+        panel.Controls.Add(_lblPaidBy, 1, 5);
+
+        panel.Controls.Add(new Label { Text = "Thanh toán", AutoSize = true }, 0, 6);
+        panel.Controls.Add(_lblMethod, 1, 6);
+
+        panel.Controls.Add(new Label { Text = "Trạng thái", AutoSize = true }, 0, 7);
+        panel.Controls.Add(_lblStatus, 1, 7);
 
         return panel;
     }
@@ -154,7 +162,7 @@ public sealed class InvoiceDetailsForm : Form
 
     private static Guna2Button CreateSecondaryButton(string text)
     {
-        var button = new Guna2Button
+        return new Guna2Button
         {
             Text = text,
             Width = 110,
@@ -164,7 +172,6 @@ public sealed class InvoiceDetailsForm : Form
             ForeColor = Color.FromArgb(33, 37, 41),
             Font = new Font("Segoe UI", 9F, FontStyle.Bold)
         };
-        return button;
     }
 
     private void LoadDetails()
@@ -181,16 +188,19 @@ public sealed class InvoiceDetailsForm : Form
         _lblCustomer.Text = header["FullName"].ToString();
         _lblContact.Text = $"{header["Phone"]} | {header["Email"]}";
         _lblDates.Text = $"{Convert.ToDateTime(header["CheckInDate"]):d} - {Convert.ToDateTime(header["CheckOutDate"]):d}";
+        _lblBookedBy.Text = FormatEmployee(header["BookedByEmployeeId"], header["BookedByEmployeeName"], "Không rõ");
+        _lblPaidBy.Text = FormatEmployee(header["PaidByEmployeeId"], header["PaidByEmployeeName"], "Không rõ");
         _lblMethod.Text = $"{MapPaymentMethod(header["PaymentMethod"]?.ToString())} | {Convert.ToDateTime(header["InvoiceDate"]):g}";
         _lblStatus.Text = MapInvoiceStatus(header["Status"]?.ToString());
 
-        _lblSubtotal.Text = Convert.ToDecimal(header["Subtotal"]).ToString("N2");
-        _lblDiscount.Text = Convert.ToDecimal(header["Discount"]).ToString("N2");
-        _lblTax.Text = Convert.ToDecimal(header["Tax"]).ToString("N2");
-        _lblTotal.Text = Convert.ToDecimal(header["Total"]).ToString("N2");
+        _lblSubtotal.Text = FormatMoney(Convert.ToDecimal(header["Subtotal"]));
+        _lblDiscount.Text = FormatMoney(Convert.ToDecimal(header["Discount"]));
+        _lblTax.Text = FormatMoney(Convert.ToDecimal(header["Tax"]));
+        _lblTotal.Text = FormatMoney(Convert.ToDecimal(header["Total"]));
 
         _linesTable = _invoiceService.GetInvoiceRoomLines(_invoiceId);
         _grid.DataSource = _linesTable;
+
         if (_grid.Columns["RoomNumber"] is { } roomNumberColumn)
         {
             roomNumberColumn.HeaderText = "Số phòng";
@@ -202,6 +212,8 @@ public sealed class InvoiceDetailsForm : Form
         if (_grid.Columns["PricePerNight"] is { } priceColumn)
         {
             priceColumn.HeaderText = "Giá/đêm";
+            priceColumn.DefaultCellStyle.Format = "N0";
+            priceColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["Nights"] is { } nightsColumn)
         {
@@ -210,6 +222,8 @@ public sealed class InvoiceDetailsForm : Form
         if (_grid.Columns["LineTotal"] is { } lineTotalColumn)
         {
             lineTotalColumn.HeaderText = "Thành tiền";
+            lineTotalColumn.DefaultCellStyle.Format = "N0";
+            lineTotalColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
     }
 
@@ -247,6 +261,8 @@ public sealed class InvoiceDetailsForm : Form
         g.DrawString($"Khách hàng: {_lblCustomer.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Liên hệ: {_lblContact.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Ngày ở: {_lblDates.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
+        g.DrawString($"Nhân viên đặt: {_lblBookedBy.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
+        g.DrawString($"Nhân viên thu: {_lblPaidBy.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Thanh toán: {_lblMethod.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Trạng thái: {_lblStatus.Text}", regularFont, Brushes.Black, left, top); top += lineHeight * 2;
 
@@ -266,9 +282,9 @@ public sealed class InvoiceDetailsForm : Form
             {
                 g.DrawString(row["RoomNumber"].ToString(), regularFont, Brushes.Black, left, top);
                 g.DrawString(row["TypeName"].ToString(), regularFont, Brushes.Black, left + 120, top);
-                g.DrawString(Convert.ToDecimal(row["PricePerNight"]).ToString("N0"), regularFont, Brushes.Black, left + 320, top);
+                g.DrawString(FormatMoney(Convert.ToDecimal(row["PricePerNight"])), regularFont, Brushes.Black, left + 320, top);
                 g.DrawString(row["Nights"].ToString(), regularFont, Brushes.Black, left + 420, top);
-                g.DrawString(Convert.ToDecimal(row["LineTotal"]).ToString("N0"), regularFont, Brushes.Black, left + 520, top);
+                g.DrawString(FormatMoney(Convert.ToDecimal(row["LineTotal"])), regularFont, Brushes.Black, left + 520, top);
                 top += lineHeight;
             }
         }
@@ -282,7 +298,7 @@ public sealed class InvoiceDetailsForm : Form
 
     private static Guna2Button CreatePrimaryButton(string text)
     {
-        var button = new Guna2Button
+        return new Guna2Button
         {
             Text = text,
             Width = 110,
@@ -292,7 +308,6 @@ public sealed class InvoiceDetailsForm : Form
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold)
         };
-        return button;
     }
 
     private static string MapInvoiceStatus(string? status)
@@ -315,4 +330,18 @@ public sealed class InvoiceDetailsForm : Form
             _ => method ?? string.Empty
         };
     }
+
+    private static string FormatEmployee(object employeeId, object employeeName, string fallback)
+    {
+        if (employeeId == DBNull.Value || employeeName == DBNull.Value)
+        {
+            return fallback;
+        }
+
+        var id = Convert.ToInt32(employeeId);
+        var name = employeeName.ToString();
+        return string.IsNullOrWhiteSpace(name) ? fallback : $"NV{id:D4} - {name}";
+    }
+
+    private static string FormatMoney(decimal amount) => $"{amount:N0} đ";
 }

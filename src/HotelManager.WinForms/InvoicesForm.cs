@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Drawing;
 using Guna.UI2.WinForms;
 using HotelManager.BLL;
@@ -47,6 +47,30 @@ public sealed class InvoicesForm : Form
             {
                 e.Value = MapPaymentMethod(e.Value?.ToString());
                 e.FormattingApplied = true;
+                return;
+            }
+
+            if (_grid.Columns["PaidByEmployeeId"] is { } employeeIdColumn && e.ColumnIndex == employeeIdColumn.Index)
+            {
+                if (e.Value is null || e.Value == DBNull.Value)
+                {
+                    e.Value = string.Empty;
+                    e.FormattingApplied = true;
+                    return;
+                }
+
+                if (e.Value is int employeeId)
+                {
+                    e.Value = $"NV{employeeId:D4}";
+                    e.FormattingApplied = true;
+                    return;
+                }
+
+                if (e.Value is long employeeIdLong)
+                {
+                    e.Value = $"NV{employeeIdLong:D4}";
+                    e.FormattingApplied = true;
+                }
             }
         };
         _grid.CellDoubleClick += (_, _) => ShowDetails();
@@ -120,18 +144,26 @@ public sealed class InvoicesForm : Form
         if (_grid.Columns["Subtotal"] is { } subtotalColumn)
         {
             subtotalColumn.HeaderText = "Tạm tính";
+            subtotalColumn.DefaultCellStyle.Format = "N0";
+            subtotalColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["Discount"] is { } discountColumn)
         {
             discountColumn.HeaderText = "Giảm giá";
+            discountColumn.DefaultCellStyle.Format = "N0";
+            discountColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["Tax"] is { } taxColumn)
         {
             taxColumn.HeaderText = "Thuế";
+            taxColumn.DefaultCellStyle.Format = "N0";
+            taxColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["Total"] is { } totalColumn)
         {
             totalColumn.HeaderText = "Tổng cộng";
+            totalColumn.DefaultCellStyle.Format = "N0";
+            totalColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["Status"] is { } statusColumn)
         {
@@ -144,6 +176,15 @@ public sealed class InvoicesForm : Form
         if (_grid.Columns["PaidAt"] is { } paidAtColumn)
         {
             paidAtColumn.HeaderText = "Thời điểm thanh toán";
+        }
+        if (_grid.Columns["PaidByEmployeeId"] is { } paidByEmployeeIdColumn)
+        {
+            paidByEmployeeIdColumn.HeaderText = "Mã NV thu";
+            paidByEmployeeIdColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        }
+        if (_grid.Columns["PaidByEmployeeName"] is { } paidByEmployeeNameColumn)
+        {
+            paidByEmployeeNameColumn.HeaderText = "Nhân viên thu";
         }
     }
 
@@ -187,7 +228,7 @@ public sealed class InvoicesForm : Form
 
     private static Guna2Button CreatePrimaryButton(string text, int width)
     {
-        var button = new Guna2Button
+        return new Guna2Button
         {
             Text = text,
             Width = width,
@@ -197,7 +238,6 @@ public sealed class InvoicesForm : Form
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 9F, FontStyle.Bold)
         };
-        return button;
     }
 
     private static void StyleSecondaryButton(Guna2Button button)

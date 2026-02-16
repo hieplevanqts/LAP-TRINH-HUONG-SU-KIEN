@@ -19,10 +19,14 @@ SELECT i.InvoiceId,
        i.Total,
        i.Status,
        i.PaymentMethod,
-       i.PaidAt
+       i.PaidAt,
+       ep.EmployeeId AS PaidByEmployeeId,
+       ep.FullName AS PaidByEmployeeName
 FROM Invoices i
 JOIN Bookings b ON b.BookingId = i.BookingId
 JOIN Customers c ON c.CustomerId = b.CustomerId
+LEFT JOIN Accounts ap ON ap.AccountId = i.CreatedByAccountId
+LEFT JOIN Employees ep ON ep.EmployeeId = ap.EmployeeId
 WHERE i.InvoiceDate >= @FromDate AND i.InvoiceDate < DATEADD(day, 1, @ToDate)
 ORDER BY i.InvoiceDate DESC, i.InvoiceId DESC;";
 
@@ -43,6 +47,8 @@ SELECT i.InvoiceId,
        c.Email,
        b.CheckInDate,
        b.CheckOutDate,
+       eb.EmployeeId AS BookedByEmployeeId,
+       eb.FullName AS BookedByEmployeeName,
        i.InvoiceDate,
        i.Subtotal,
        i.Discount,
@@ -50,10 +56,16 @@ SELECT i.InvoiceId,
        i.Total,
        i.Status,
        i.PaymentMethod,
-       i.PaidAt
+       i.PaidAt,
+       ep.EmployeeId AS PaidByEmployeeId,
+       ep.FullName AS PaidByEmployeeName
 FROM Invoices i
 JOIN Bookings b ON b.BookingId = i.BookingId
 JOIN Customers c ON c.CustomerId = b.CustomerId
+LEFT JOIN Accounts ab ON ab.AccountId = b.CreatedByAccountId
+LEFT JOIN Employees eb ON eb.EmployeeId = ab.EmployeeId
+LEFT JOIN Accounts ap ON ap.AccountId = i.CreatedByAccountId
+LEFT JOIN Employees ep ON ep.EmployeeId = ap.EmployeeId
 WHERE i.InvoiceId = @InvoiceId;";
 
         var table = Db.ExecuteQuery(sql, new SqlParameter("@InvoiceId", invoiceId));

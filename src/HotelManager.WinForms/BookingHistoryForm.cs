@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Drawing;
 using Guna.UI2.WinForms;
 using HotelManager.BLL;
@@ -15,7 +15,7 @@ public sealed class BookingHistoryForm : Form
 
     public BookingHistoryForm()
     {
-        Text = "Lịch sử đặt phòng";
+        Text = "Lá»‹ch sá»­ Ä‘áº·t phÃ²ng";
         Width = 900;
         Height = 600;
         StartPosition = FormStartPosition.CenterParent;
@@ -40,6 +40,30 @@ public sealed class BookingHistoryForm : Form
             {
                 e.Value = MapBookingStatus(e.Value?.ToString());
                 e.FormattingApplied = true;
+                return;
+            }
+
+            if (_grid.Columns["CreatedByEmployeeId"] is { } employeeIdColumn && e.ColumnIndex == employeeIdColumn.Index)
+            {
+                if (e.Value is null || e.Value == DBNull.Value)
+                {
+                    e.Value = string.Empty;
+                    e.FormattingApplied = true;
+                    return;
+                }
+
+                if (e.Value is int employeeId)
+                {
+                    e.Value = $"NV{employeeId:D4}";
+                    e.FormattingApplied = true;
+                    return;
+                }
+
+                if (e.Value is long employeeIdLong)
+                {
+                    e.Value = $"NV{employeeIdLong:D4}";
+                    e.FormattingApplied = true;
+                }
             }
         };
 
@@ -73,19 +97,19 @@ public sealed class BookingHistoryForm : Form
         _cbStatus.DropDownStyle = ComboBoxStyle.DropDownList;
         _cbStatus.Items.AddRange(
         [
-            new StatusOption("All", "Tất cả"),
-            new StatusOption("Pending", "Chờ"),
-            new StatusOption("Paid", "Đã thanh toán")
+            new StatusOption("All", "Táº¥t cáº£"),
+            new StatusOption("Pending", "Chá»"),
+            new StatusOption("Paid", "ÄÃ£ thanh toÃ¡n")
         ]);
 
-        var btnFilter = CreatePrimaryButton("Lọc", 100);
+        var btnFilter = CreatePrimaryButton("Lá»c", 100);
         btnFilter.Click += (_, _) => LoadHistory();
 
-        panel.Controls.Add(new Label { Text = "Từ ngày", AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
+        panel.Controls.Add(new Label { Text = "Tá»« ngÃ y", AutoSize = true, Padding = new Padding(0, 6, 0, 0) });
         panel.Controls.Add(_dtFrom);
-        panel.Controls.Add(new Label { Text = "Đến ngày", AutoSize = true, Padding = new Padding(10, 6, 0, 0) });
+        panel.Controls.Add(new Label { Text = "Äáº¿n ngÃ y", AutoSize = true, Padding = new Padding(10, 6, 0, 0) });
         panel.Controls.Add(_dtTo);
-        panel.Controls.Add(new Label { Text = "Trạng thái", AutoSize = true, Padding = new Padding(10, 6, 0, 0) });
+        panel.Controls.Add(new Label { Text = "Tráº¡ng thÃ¡i", AutoSize = true, Padding = new Padding(10, 6, 0, 0) });
         panel.Controls.Add(_cbStatus);
         panel.Controls.Add(btnFilter);
 
@@ -96,7 +120,7 @@ public sealed class BookingHistoryForm : Form
     {
         if (_dtTo.Value.Date < _dtFrom.Value.Date)
         {
-            MessageBox.Show("Ngày đến phải >= ngày từ.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("NgÃ y Ä‘áº¿n pháº£i >= ngÃ y tá»«.", "ThÃ´ng bÃ¡o", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -108,31 +132,40 @@ public sealed class BookingHistoryForm : Form
         }
         if (_grid.Columns["FullName"] is { } fullNameColumn)
         {
-            fullNameColumn.HeaderText = "Khách hàng";
+            fullNameColumn.HeaderText = "KhÃ¡ch hÃ ng";
         }
         if (_grid.Columns["CheckInDate"] is { } checkInColumn)
         {
-            checkInColumn.HeaderText = "Nhận phòng";
+            checkInColumn.HeaderText = "Nháº­n phÃ²ng";
         }
         if (_grid.Columns["CheckOutDate"] is { } checkOutColumn)
         {
-            checkOutColumn.HeaderText = "Trả phòng";
+            checkOutColumn.HeaderText = "Tráº£ phÃ²ng";
         }
         if (_grid.Columns["Adults"] is { } adultsColumn)
         {
-            adultsColumn.HeaderText = "Người lớn";
+            adultsColumn.HeaderText = "NgÆ°á»i lá»›n";
         }
         if (_grid.Columns["Children"] is { } childrenColumn)
         {
-            childrenColumn.HeaderText = "Trẻ em";
+            childrenColumn.HeaderText = "Tráº» em";
         }
         if (_grid.Columns["Status"] is { } statusColumn)
         {
-            statusColumn.HeaderText = "Trạng thái";
+            statusColumn.HeaderText = "Tráº¡ng thÃ¡i";
         }
         if (_grid.Columns["CreatedAt"] is { } createdAtColumn)
         {
             createdAtColumn.HeaderText = "Ngày tạo";
+        }
+        if (_grid.Columns["CreatedByEmployeeId"] is { } createdByEmployeeIdColumn)
+        {
+            createdByEmployeeIdColumn.HeaderText = "Mã NV";
+            createdByEmployeeIdColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        }
+        if (_grid.Columns["CreatedByEmployeeName"] is { } createdByEmployeeNameColumn)
+        {
+            createdByEmployeeNameColumn.HeaderText = "Nhân viên tạo";
         }
     }
 
@@ -217,9 +250,10 @@ public sealed class BookingHistoryForm : Form
     {
         return status switch
         {
-            "Pending" => "Chờ",
-            "Paid" => "Đã thanh toán",
+            "Pending" => "Chá»",
+            "Paid" => "ÄÃ£ thanh toÃ¡n",
             _ => status ?? string.Empty
         };
     }
 }
+

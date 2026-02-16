@@ -9,44 +9,48 @@ public sealed class SettingsForm : Form
     private readonly Guna2TextBox _txtAccountNumber = new();
     private readonly Guna2TextBox _txtAccountName = new();
     private readonly Guna2TextBox _txtQrPath = new();
+    private readonly Guna2CheckBox _chkUseActualCheckoutPricing = new();
+    private readonly TableLayoutPanel _layout = new();
 
     public SettingsForm()
     {
         Text = "Cài đặt thanh toán";
         Width = 600;
-        Height = 400;
+        Height = 520;
+        MinimumSize = new Size(600, 520);
         StartPosition = FormStartPosition.CenterParent;
         BackColor = Color.FromArgb(245, 247, 251);
         Font = new Font("Segoe UI", 9F);
 
-        var layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            RowCount = 3,
-            ColumnCount = 1
-        };
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        _layout.Dock = DockStyle.Fill;
+        _layout.RowCount = 2;
+        _layout.ColumnCount = 1;
+        _layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         var formPanel = BuildFormPanel();
         var buttonPanel = BuildButtonPanel();
 
-        layout.Controls.Add(formPanel, 0, 0);
-        layout.Controls.Add(buttonPanel, 0, 2);
+        _layout.Controls.Add(formPanel, 0, 0);
+        _layout.Controls.Add(buttonPanel, 0, 1);
 
-        Controls.Add(layout);
+        Controls.Add(_layout);
 
-        Load += (_, _) => LoadSettings();
+        Load += (_, _) =>
+        {
+            LoadSettings();
+            BeginInvoke(AdjustSizeToContent);
+        };
     }
 
     private Control BuildFormPanel()
     {
         var panel = new TableLayoutPanel
         {
-            Dock = DockStyle.Top,
+            Dock = DockStyle.Fill,
             ColumnCount = 2,
             AutoSize = true,
+            AutoScroll = true,
             Padding = new Padding(12)
         };
 
@@ -77,6 +81,11 @@ public sealed class SettingsForm : Form
         qrPanel.Controls.Add(_txtQrPath);
         qrPanel.Controls.Add(btnBrowse);
         panel.Controls.Add(qrPanel, 1, 3);
+
+        panel.Controls.Add(new Label { Text = "Tính tiền theo thời điểm trả", AutoSize = true }, 0, 4);
+        _chkUseActualCheckoutPricing.Text = "Bật tính tiền phòng theo thời điểm trả thực tế";
+        _chkUseActualCheckoutPricing.AutoSize = true;
+        panel.Controls.Add(_chkUseActualCheckoutPricing, 1, 4);
 
         return panel;
     }
@@ -110,6 +119,7 @@ public sealed class SettingsForm : Form
         _txtAccountNumber.Text = settings.AccountNumber;
         _txtAccountName.Text = settings.AccountName;
         _txtQrPath.Text = settings.QrImagePath;
+        _chkUseActualCheckoutPricing.Checked = settings.UseActualCheckoutPricing;
     }
 
     private void SaveSettings()
@@ -119,7 +129,8 @@ public sealed class SettingsForm : Form
             BankName = _txtBankName.Text.Trim(),
             AccountNumber = _txtAccountNumber.Text.Trim(),
             AccountName = _txtAccountName.Text.Trim(),
-            QrImagePath = _txtQrPath.Text.Trim()
+            QrImagePath = _txtQrPath.Text.Trim(),
+            UseActualCheckoutPricing = _chkUseActualCheckoutPricing.Checked
         };
 
         try
@@ -146,6 +157,24 @@ public sealed class SettingsForm : Form
         {
             _txtQrPath.Text = dialog.FileName;
         }
+    }
+
+    private void AdjustSizeToContent()
+    {
+        _layout.PerformLayout();
+
+        var preferredClient = _layout.GetPreferredSize(new Size(900, 0));
+        var frameWidth = Width - ClientSize.Width;
+        var frameHeight = Height - ClientSize.Height;
+
+        var targetWidth = Math.Max(MinimumSize.Width, preferredClient.Width + frameWidth + 16);
+        var targetHeight = Math.Max(MinimumSize.Height, preferredClient.Height + frameHeight + 16);
+
+        var workArea = Screen.FromControl(this).WorkingArea;
+        targetWidth = Math.Min(targetWidth, workArea.Width - 40);
+        targetHeight = Math.Min(targetHeight, workArea.Height - 40);
+
+        Size = new Size(targetWidth, targetHeight);
     }
 
     private static void StyleTextBox(Guna2TextBox textBox, string placeholder)

@@ -12,6 +12,8 @@ public sealed class BookingService
 SELECT b.BookingId, c.FullName, b.CheckInDate, b.CheckOutDate, b.Status
 FROM Bookings b
 JOIN Customers c ON c.CustomerId = b.CustomerId
+LEFT JOIN Accounts a ON a.AccountId = b.CreatedByAccountId
+LEFT JOIN Employees e ON e.EmployeeId = a.EmployeeId
 ORDER BY b.BookingId DESC";
 
         return Db.ExecuteQuery(sql);
@@ -27,9 +29,13 @@ SELECT b.BookingId,
        b.Adults,
        b.Children,
        b.Status,
-       b.CreatedAt
+       b.CreatedAt,
+       e.EmployeeId AS CreatedByEmployeeId,
+       e.FullName AS CreatedByEmployeeName
 FROM Bookings b
 JOIN Customers c ON c.CustomerId = b.CustomerId
+LEFT JOIN Accounts a ON a.AccountId = b.CreatedByAccountId
+LEFT JOIN Employees e ON e.EmployeeId = a.EmployeeId
 WHERE b.CreatedAt >= @FromDate AND b.CreatedAt < DATEADD(day, 1, @ToDate)
   AND (@Status IS NULL OR @Status = N'All' OR b.Status = @Status)
 ORDER BY b.CreatedAt DESC, b.BookingId DESC;";
@@ -151,8 +157,8 @@ WHERE RoomId = @RoomId;";
             }
 
             const string insertServiceSql = @"
-INSERT INTO ServiceUsages (BookingId, ServiceId, Quantity, UnitPrice)
-SELECT @BookingId, s.ServiceId, @Quantity, s.UnitPrice
+INSERT INTO ServiceUsages (BookingId, ServiceId, Quantity, UnitPrice, AddedByAccountId)
+SELECT @BookingId, s.ServiceId, @Quantity, s.UnitPrice, @AddedByAccountId
 FROM Services s
 WHERE s.ServiceId = @ServiceId;";
 
@@ -162,6 +168,7 @@ WHERE s.ServiceId = @ServiceId;";
                 insertServiceCmd.Parameters.AddWithValue("@BookingId", bookingId);
                 insertServiceCmd.Parameters.AddWithValue("@ServiceId", service.ServiceId);
                 insertServiceCmd.Parameters.AddWithValue("@Quantity", service.Quantity);
+                insertServiceCmd.Parameters.AddWithValue("@AddedByAccountId", (object?)createdByAccountId ?? DBNull.Value);
                 insertServiceCmd.ExecuteNonQuery();
             }
 

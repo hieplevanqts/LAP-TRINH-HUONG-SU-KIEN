@@ -41,6 +41,7 @@ public static class DbInitializer
 
         EnsureEmployeeProfileColumns(connection, databaseName);
         EnsureAttendanceTable(connection, databaseName);
+        EnsureScopedServiceColumns(connection, databaseName);
         EnsureUserAccess(builder.ConnectionString, databaseName);
     }
 
@@ -129,6 +130,38 @@ END",
             connection);
 
         command.ExecuteNonQuery();
+    }
+
+    private static void EnsureScopedServiceColumns(SqlConnection connection, string databaseName)
+    {
+        using var command = new SqlCommand(
+            $@"
+USE [{databaseName}];
+
+IF COL_LENGTH('dbo.Services', 'IsCustom') IS NULL
+BEGIN
+    ALTER TABLE dbo.Services ADD IsCustom BIT NOT NULL CONSTRAINT DF_Services_IsCustom DEFAULT(0);
+END
+
+IF COL_LENGTH('dbo.Services', 'BookingScopeId') IS NULL
+BEGIN
+    ALTER TABLE dbo.Services ADD BookingScopeId INT NULL;
+END",
+            connection);
+
+        command.ExecuteNonQuery();
+
+        using var usageCommand = new SqlCommand(
+            $@"
+USE [{databaseName}];
+
+IF COL_LENGTH('dbo.ServiceUsages', 'CustomServiceName') IS NULL
+BEGIN
+    ALTER TABLE dbo.ServiceUsages ADD CustomServiceName NVARCHAR(100) NULL;
+END",
+            connection);
+
+        usageCommand.ExecuteNonQuery();
     }
 
     private static void EnsureUserAccess(string masterConnectionString, string databaseName)

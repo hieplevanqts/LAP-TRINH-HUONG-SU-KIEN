@@ -11,12 +11,12 @@ public sealed class ServicesForm : Form
     private readonly Guna2DataGridView _grid = new();
     private readonly Guna2TextBox _txtServiceName = new();
     private readonly Guna2NumericUpDown _numUnitPrice = new();
-    private readonly Guna2CheckBox _chkActive = new() { Text = "KÃ­ch hoáº¡t", Checked = true, AutoSize = true };
+    private readonly Guna2CheckBox _chkActive = new() { Text = "Kích hoạt", Checked = true, AutoSize = true };
     private int? _selectedServiceId;
 
     public ServicesForm()
     {
-        Text = "Quáº£n lÃ½ dá»‹ch vá»¥";
+        Text = "Quản lý dịch vụ";
         Width = 900;
         Height = 600;
         StartPosition = FormStartPosition.CenterParent;
@@ -63,12 +63,12 @@ public sealed class ServicesForm : Form
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30));
 
-        panel.Controls.Add(new Label { Text = "TÃªn dá»‹ch vá»¥", AutoSize = true }, 0, 0);
-        StyleTextBox(_txtServiceName, "Giáº·t á»§i");
+        panel.Controls.Add(new Label { Text = "Tên dịch vụ", AutoSize = true }, 0, 0);
+        StyleTextBox(_txtServiceName, "Giặt ủi");
         _txtServiceName.Dock = DockStyle.Fill;
         panel.Controls.Add(_txtServiceName, 1, 0);
 
-        panel.Controls.Add(new Label { Text = "GiÃ¡ tiá»n", AutoSize = true }, 2, 0);
+        panel.Controls.Add(new Label { Text = "Giá tiền", AutoSize = true }, 2, 0);
         StyleNumeric(_numUnitPrice);
         _numUnitPrice.Dock = DockStyle.Fill;
         _numUnitPrice.Minimum = 0;
@@ -92,10 +92,10 @@ public sealed class ServicesForm : Form
             AutoSize = true
         };
 
-        var btnAdd = CreatePrimaryButton("ThÃªm");
-        var btnUpdate = CreatePrimaryButton("Sá»­a");
-        var btnDelete = CreateDangerButton("XÃ³a");
-        var btnClear = CreateSecondaryButton("LÃ m má»›i");
+        var btnAdd = CreatePrimaryButton("Thêm");
+        var btnUpdate = CreatePrimaryButton("Sửa");
+        var btnDelete = CreateDangerButton("Xóa");
+        var btnClear = CreateSecondaryButton("Làm mới");
 
         btnAdd.Click += (_, _) => AddService();
         btnUpdate.Click += (_, _) => UpdateService();
@@ -119,17 +119,17 @@ public sealed class ServicesForm : Form
         }
         if (_grid.Columns["ServiceName"] is { } nameColumn)
         {
-            nameColumn.HeaderText = "TÃªn dá»‹ch vá»¥";
+            nameColumn.HeaderText = "Tên dịch vụ";
         }
         if (_grid.Columns["UnitPrice"] is { } priceColumn)
         {
-            priceColumn.HeaderText = "GiÃ¡ tiá»n";
+            priceColumn.HeaderText = "Giá tiền";
             priceColumn.DefaultCellStyle.Format = "N0";
             priceColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
         if (_grid.Columns["IsActive"] is { } activeColumn)
         {
-            activeColumn.HeaderText = "KÃ­ch hoáº¡t";
+            activeColumn.HeaderText = "Kích hoạt";
         }
     }
 
@@ -160,7 +160,7 @@ public sealed class ServicesForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"ThÃªm dá»‹ch vá»¥ tháº¥t báº¡i: {ex.Message}", "Lá»—i", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"Thêm dịch vụ thất bại: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -168,7 +168,7 @@ public sealed class ServicesForm : Form
     {
         if (_selectedServiceId is null)
         {
-            MessageBox.Show("Chá»n dá»‹ch vá»¥ cáº§n sá»­a.", "ThÃ´ng bÃ¡o", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Chọn dịch vụ cần sửa.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -185,7 +185,7 @@ public sealed class ServicesForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Sá»­a dá»‹ch vá»¥ tháº¥t báº¡i: {ex.Message}", "Lá»—i", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"Sửa dịch vụ thất bại: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -193,11 +193,11 @@ public sealed class ServicesForm : Form
     {
         if (_selectedServiceId is null)
         {
-            MessageBox.Show("Chá»n dá»‹ch vá»¥ cáº§n xÃ³a.", "ThÃ´ng bÃ¡o", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Chọn dịch vụ cần xóa.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        var confirm = MessageBox.Show("Báº¡n cháº¯c cháº¯n muá»‘n xÃ³a dá»‹ch vá»¥ nÃ y?", "XÃ¡c nháº­n", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+        var confirm = MessageBox.Show("Bạn chắc chắn muốn xóa dịch vụ này?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
         if (confirm != DialogResult.Yes)
         {
             return;
@@ -211,7 +211,7 @@ public sealed class ServicesForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"XÃ³a dá»‹ch vá»¥ tháº¥t báº¡i: {ex.Message}", "Lá»—i", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"Xóa dịch vụ thất bại: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -223,7 +223,7 @@ public sealed class ServicesForm : Form
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            MessageBox.Show("Nháº­p tÃªn dá»‹ch vá»¥.", "ThÃ´ng bÃ¡o", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Nhập tên dịch vụ.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return false;
         }
 

@@ -86,7 +86,9 @@ CREATE TABLE dbo.Services (
     ServiceName NVARCHAR(100) NOT NULL UNIQUE,
     Unit NVARCHAR(20) NOT NULL DEFAULT N'Unit',
     UnitPrice DECIMAL(18,2) NOT NULL,
-    IsActive BIT NOT NULL DEFAULT (1)
+    IsActive BIT NOT NULL DEFAULT (1),
+    IsCustom BIT NOT NULL DEFAULT (0),
+    BookingScopeId INT NULL
 );
 
 CREATE TABLE dbo.Bookings (
@@ -121,6 +123,7 @@ CREATE TABLE dbo.ServiceUsages (
     ServiceUsageId INT IDENTITY(1,1) PRIMARY KEY,
     BookingId INT NOT NULL,
     ServiceId INT NOT NULL,
+    CustomServiceName NVARCHAR(100) NULL,
     Quantity INT NOT NULL,
     UnitPrice DECIMAL(18,2) NOT NULL,
     UsedAt DATETIME2 NOT NULL DEFAULT (SYSDATETIME()),

@@ -92,7 +92,7 @@ ORDER BY r.RoomNumber;";
     public DataTable GetInvoiceServiceLines(int invoiceId)
     {
         const string sql = @"
-SELECT s.ServiceName,
+SELECT COALESCE(su.CustomServiceName, s.ServiceName) AS ServiceName,
        su.Quantity,
        su.UnitPrice,
        su.Quantity * su.UnitPrice AS Amount

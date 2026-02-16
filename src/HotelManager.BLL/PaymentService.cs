@@ -172,7 +172,7 @@ WHERE BookingId = @BookingId;";
         const string sql = @"
 SELECT su.ServiceUsageId,
        su.ServiceId,
-       s.ServiceName,
+       COALESCE(su.CustomServiceName, s.ServiceName) AS ServiceName,
        su.Quantity,
        su.UnitPrice,
        su.Quantity * su.UnitPrice AS Amount
@@ -321,7 +321,8 @@ WHERE BookingId = @BookingId
 SELECT COUNT(1)
 FROM Services
 WHERE ServiceId = @ServiceId
-  AND IsActive = 1;";
+  AND IsActive = 1
+  AND ISNULL(IsCustom, 0) = 0;";
 
             using var validateServiceCmd = new SqlCommand(validateServiceSql, connection, transaction);
             validateServiceCmd.Parameters.AddWithValue("@ServiceId", serviceId);
@@ -343,6 +344,90 @@ WHERE s.ServiceId = @ServiceId;";
             insertCmd.Parameters.AddWithValue("@Quantity", quantity);
             insertCmd.Parameters.AddWithValue("@AddedByAccountId", (object?)addedByAccountId ?? DBNull.Value);
             insertCmd.ExecuteNonQuery();
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
+
+    public void AddCustomServiceUsage(int bookingId, string serviceName, decimal unitPrice, int quantity, int? addedByAccountId)
+    {
+        if (string.IsNullOrWhiteSpace(serviceName))
+        {
+            throw new ArgumentException("Service name is required.", nameof(serviceName));
+        }
+
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be greater than 0.");
+        }
+
+        if (unitPrice <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(unitPrice), "Unit price must be greater than 0.");
+        }
+
+        using var connection = Db.GetOpenConnection();
+        using var transaction = connection.BeginTransaction();
+
+        try
+        {
+            const string validateBookingSql = @"
+SELECT COUNT(1)
+FROM Bookings
+WHERE BookingId = @BookingId
+  AND Status = N'Pending';";
+
+            using var validateBookingCmd = new SqlCommand(validateBookingSql, connection, transaction);
+            validateBookingCmd.Parameters.AddWithValue("@BookingId", bookingId);
+            var bookingExists = Convert.ToInt32(validateBookingCmd.ExecuteScalar()) > 0;
+            if (!bookingExists)
+            {
+                throw new InvalidOperationException("Chỉ có thể thêm dịch vụ cho đặt phòng đang chờ thanh toán.");
+            }
+
+            const string getMetaServiceSql = @"
+SELECT TOP 1 ServiceId
+FROM Services
+WHERE ServiceName = N'__BOOKING_CUSTOM_SERVICE__'
+  AND ISNULL(IsCustom, 0) = 1;";
+
+            int metaServiceId;
+            using (var getMetaServiceCmd = new SqlCommand(getMetaServiceSql, connection, transaction))
+            {
+                var scalar = getMetaServiceCmd.ExecuteScalar();
+                if (scalar is null || scalar == DBNull.Value)
+                {
+                    const string insertMetaServiceSql = @"
+INSERT INTO Services (ServiceName, Unit, UnitPrice, IsActive, IsCustom, BookingScopeId)
+VALUES (N'__BOOKING_CUSTOM_SERVICE__', N'Item', 0, 0, 1, NULL);
+SELECT CAST(SCOPE_IDENTITY() AS int);";
+
+                    using var insertMetaServiceCmd = new SqlCommand(insertMetaServiceSql, connection, transaction);
+                    metaServiceId = Convert.ToInt32(insertMetaServiceCmd.ExecuteScalar());
+                }
+                else
+                {
+                    metaServiceId = Convert.ToInt32(scalar);
+                }
+            }
+
+            const string insertUsageSql = @"
+INSERT INTO ServiceUsages (BookingId, ServiceId, CustomServiceName, Quantity, UnitPrice, AddedByAccountId)
+VALUES (@BookingId, @ServiceId, @CustomServiceName, @Quantity, @UnitPrice, @AddedByAccountId);";
+
+            using var insertUsageCmd = new SqlCommand(insertUsageSql, connection, transaction);
+            insertUsageCmd.Parameters.AddWithValue("@BookingId", bookingId);
+            insertUsageCmd.Parameters.AddWithValue("@ServiceId", metaServiceId);
+            insertUsageCmd.Parameters.AddWithValue("@CustomServiceName", serviceName.Trim());
+            insertUsageCmd.Parameters.AddWithValue("@Quantity", quantity);
+            insertUsageCmd.Parameters.AddWithValue("@UnitPrice", unitPrice);
+            insertUsageCmd.Parameters.AddWithValue("@AddedByAccountId", (object?)addedByAccountId ?? DBNull.Value);
+            insertUsageCmd.ExecuteNonQuery();
 
             transaction.Commit();
         }

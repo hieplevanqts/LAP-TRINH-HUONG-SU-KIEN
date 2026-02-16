@@ -288,7 +288,7 @@ public sealed class BookingsForm : Form
             var roomType = row["RoomType"].ToString();
             var floor = row["Floor"];
             var status = row["Status"].ToString();
-            _roomsList.Items.Add(new RoomItem(roomId, $"{roomNumber} - {roomType} (Táº§ng {floor}) - {MapRoomStatus(status)}"));
+            _roomsList.Items.Add(new RoomItem(roomId, $"{roomNumber} - {roomType} (Tầng {floor}) - {MapRoomStatus(status)}"));
         }
     }
 

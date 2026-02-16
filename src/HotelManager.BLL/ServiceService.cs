@@ -11,24 +11,28 @@ public sealed class ServiceService
         const string sql = @"
 SELECT ServiceId, ServiceName, UnitPrice, IsActive
 FROM Services
-WHERE (@OnlyActive = 0 OR IsActive = 1)
+WHERE ISNULL(IsCustom, 0) = 0
+  AND (@OnlyActive = 0 OR IsActive = 1)
 ORDER BY ServiceName;";
 
         return Db.ExecuteQuery(sql, new SqlParameter("@OnlyActive", onlyActive ? 1 : 0));
     }
 
-    public void AddService(string serviceName, decimal unitPrice, bool isActive)
+    public int AddService(string serviceName, decimal unitPrice, bool isActive)
     {
         const string sql = @"
-INSERT INTO Services (ServiceName, UnitPrice, IsActive)
-VALUES (@ServiceName, @UnitPrice, @IsActive);";
+INSERT INTO Services (ServiceName, UnitPrice, IsActive, IsCustom, BookingScopeId)
+VALUES (@ServiceName, @UnitPrice, @IsActive, 0, NULL);
+SELECT CAST(SCOPE_IDENTITY() AS int);";
 
-        Db.ExecuteNonQuery(
+        var result = Db.ExecuteScalar(
             sql,
             new SqlParameter("@ServiceName", serviceName),
             new SqlParameter("@UnitPrice", unitPrice),
             new SqlParameter("@IsActive", isActive)
         );
+
+        return Convert.ToInt32(result);
     }
 
     public void UpdateService(int serviceId, string serviceName, decimal unitPrice, bool isActive)

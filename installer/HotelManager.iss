@@ -15,6 +15,11 @@ OutputBaseFilename=HotelManagerSetup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\installer\HotelManager.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
+PrivilegesRequired=admin
+CloseApplications=yes
+RestartApplications=no
 
 [Files]
 Source: "..\src\HotelManager.WinForms\bin\Release\net10.0-windows\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -22,6 +27,7 @@ Source: "..\installer\ThirdParty\SqlLocalDB.msi"; DestDir: "{tmp}"; Flags: ignor
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
 [Run]

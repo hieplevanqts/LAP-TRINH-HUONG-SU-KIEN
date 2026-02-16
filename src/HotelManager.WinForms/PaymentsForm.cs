@@ -156,6 +156,9 @@ public sealed class PaymentsForm : Form
         var btnDeleteService = CreateSecondaryButton("Xóa");
         btnDeleteService.Width = 90;
         btnDeleteService.Click += (_, _) => DeleteSelectedServiceUsage();
+        var btnCreateService = CreateSecondaryButton("Dịch vụ riêng");
+        btnCreateService.Width = 140;
+        btnCreateService.Click += (_, _) => AddCustomServiceToSelectedBooking();
 
         topRow.Controls.Add(new Label { Text = "Dịch vụ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
         topRow.Controls.Add(_cbService);
@@ -164,6 +167,7 @@ public sealed class PaymentsForm : Form
         topRow.Controls.Add(btnAddService);
         topRow.Controls.Add(btnUpdateService);
         topRow.Controls.Add(btnDeleteService);
+        topRow.Controls.Add(btnCreateService);
 
         _selectedServicesList.Dock = DockStyle.Fill;
         _selectedServicesList.BorderStyle = BorderStyle.None;
@@ -197,6 +201,41 @@ public sealed class PaymentsForm : Form
         if (_cbService.Items.Count > 0)
         {
             _cbService.SelectedIndex = 0;
+        }
+    }
+
+    private void AddCustomServiceToSelectedBooking()
+    {
+        if (_selectedBookingId is null)
+        {
+            MessageBox.Show(
+                "Chọn một đặt phòng trước khi thêm dịch vụ riêng.",
+                "Thông báo",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return;
+        }
+
+        using var form = new QuickAddServiceForm();
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            var bookingId = _selectedBookingId.Value;
+            var discount = _numDiscount.Value;
+            var tax = _numTax.Value;
+            var quantity = (int)_numServiceQty.Value;
+
+            _paymentService.AddCustomServiceUsage(bookingId, form.ServiceName, form.UnitPrice, quantity, _loginInfo.AccountId);
+            RefreshAfterServiceUsageChanged(bookingId, discount, tax);
+            MessageBox.Show("Đã thêm dịch vụ riêng cho booking này.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Không thể thêm dịch vụ riêng: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -514,7 +553,6 @@ public sealed class PaymentsForm : Form
         }
 
         _selectedServiceUsage = selected;
-        _numServiceQty.Value = Math.Clamp(selected.Quantity, (int)_numServiceQty.Minimum, (int)_numServiceQty.Maximum);
 
         if (_cbService.DataSource is List<ServiceOption> services)
         {
@@ -543,7 +581,7 @@ public sealed class PaymentsForm : Form
         if (_cbService.SelectedItem is not ServiceOption serviceOption)
         {
             MessageBox.Show(
-                "Không có dịch vụ khả dụng để thêm.",
+                "Không có dịch vụ khả dụng để thêm. Hãy bấm \"Dịch vụ riêng\".",
                 "Thông báo",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -591,7 +629,13 @@ public sealed class PaymentsForm : Form
             return;
         }
 
-        var quantity = (int)_numServiceQty.Value;
+        using var form = new EditServiceQuantityForm(_selectedServiceUsage.ServiceName, _selectedServiceUsage.Quantity);
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        var quantity = form.Quantity;
         if (quantity <= 0)
         {
             MessageBox.Show(
@@ -804,6 +848,186 @@ public sealed class PaymentsForm : Form
         public string Display { get; }
 
         public override string ToString() => Display;
+    }
+
+    private sealed class QuickAddServiceForm : Form
+    {
+        private readonly Guna2TextBox _txtName = new();
+        private readonly Guna2NumericUpDown _numPrice = new();
+
+        public string ServiceName => _txtName.Text.Trim();
+        public decimal UnitPrice => _numPrice.Value;
+
+        public QuickAddServiceForm()
+        {
+            Text = "Thêm dịch vụ riêng";
+            Width = 520;
+            Height = 230;
+            StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            BackColor = Color.FromArgb(245, 247, 251);
+            Font = new Font("Segoe UI", 9F);
+
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 3,
+                Padding = new Padding(16)
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 120));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            layout.Controls.Add(new Label { Text = "Tên dịch vụ", AutoSize = true, Padding = new Padding(0, 9, 0, 0) }, 0, 0);
+            StyleTextBox(_txtName, "Ví dụ: Giặt ủi");
+            _txtName.Dock = DockStyle.Fill;
+            layout.Controls.Add(_txtName, 1, 0);
+
+            layout.Controls.Add(new Label { Text = "Đơn giá", AutoSize = true, Padding = new Padding(0, 9, 0, 0) }, 0, 1);
+            StyleNumeric(_numPrice);
+            _numPrice.Dock = DockStyle.Fill;
+            _numPrice.Minimum = 0;
+            _numPrice.Maximum = 1000000000;
+            _numPrice.DecimalPlaces = 0;
+            _numPrice.ThousandsSeparator = true;
+            layout.Controls.Add(_numPrice, 1, 1);
+
+            var buttonPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                AutoSize = true,
+                Padding = new Padding(0, 8, 0, 0)
+            };
+
+            var btnSave = CreatePrimaryButton("Lưu");
+            var btnCancel = CreateSecondaryButton("Hủy");
+            btnSave.Click += (_, _) => SaveAndClose();
+            btnCancel.Click += (_, _) =>
+            {
+                DialogResult = DialogResult.Cancel;
+                Close();
+            };
+            buttonPanel.Controls.Add(btnSave);
+            buttonPanel.Controls.Add(btnCancel);
+
+            layout.Controls.Add(buttonPanel, 0, 2);
+            layout.SetColumnSpan(buttonPanel, 2);
+            Controls.Add(layout);
+
+            AcceptButton = btnSave;
+            CancelButton = btnCancel;
+        }
+
+        private void SaveAndClose()
+        {
+            if (string.IsNullOrWhiteSpace(ServiceName))
+            {
+                MessageBox.Show("Nhập tên dịch vụ.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _txtName.Focus();
+                return;
+            }
+
+            if (UnitPrice <= 0)
+            {
+                MessageBox.Show("Đơn giá phải lớn hơn 0.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _numPrice.Focus();
+                return;
+            }
+
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+    }
+
+    private sealed class EditServiceQuantityForm : Form
+    {
+        private readonly Guna2NumericUpDown _numQuantity = new();
+
+        public int Quantity => (int)_numQuantity.Value;
+
+        public EditServiceQuantityForm(string serviceName, int currentQuantity)
+        {
+            Text = "Sửa số lượng dịch vụ";
+            Width = 520;
+            Height = 240;
+            StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            BackColor = Color.FromArgb(245, 247, 251);
+            Font = new Font("Segoe UI", 9F);
+
+            var layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 2,
+                RowCount = 3,
+                Padding = new Padding(16)
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
+            var txtServiceName = new Guna2TextBox
+            {
+                ReadOnly = true,
+                Text = serviceName,
+                Dock = DockStyle.Fill
+            };
+            StyleTextBox(txtServiceName, string.Empty);
+
+            layout.Controls.Add(new Label { Text = "Tên dịch vụ", AutoSize = true, Padding = new Padding(0, 9, 0, 0) }, 0, 0);
+            layout.Controls.Add(txtServiceName, 1, 0);
+
+            StyleNumeric(_numQuantity);
+            _numQuantity.Dock = DockStyle.Fill;
+            _numQuantity.Minimum = 1;
+            _numQuantity.Maximum = 1000;
+            _numQuantity.Value = Math.Clamp(currentQuantity, 1, 1000);
+
+            layout.Controls.Add(new Label { Text = "Số lượng", AutoSize = true, Padding = new Padding(0, 9, 0, 0) }, 0, 1);
+            layout.Controls.Add(_numQuantity, 1, 1);
+
+            var buttonPanel = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.RightToLeft,
+                AutoSize = true,
+                Padding = new Padding(0, 8, 0, 0)
+            };
+
+            var btnSave = CreatePrimaryButton("Lưu");
+            var btnCancel = CreateSecondaryButton("Hủy");
+
+            btnSave.Click += (_, _) =>
+            {
+                DialogResult = DialogResult.OK;
+                Close();
+            };
+            btnCancel.Click += (_, _) =>
+            {
+                DialogResult = DialogResult.Cancel;
+                Close();
+            };
+
+            buttonPanel.Controls.Add(btnSave);
+            buttonPanel.Controls.Add(btnCancel);
+
+            layout.Controls.Add(buttonPanel, 0, 2);
+            layout.SetColumnSpan(buttonPanel, 2);
+
+            Controls.Add(layout);
+            AcceptButton = btnSave;
+            CancelButton = btnCancel;
+        }
     }
 
     private static string FormatMoney(decimal amount) => $"{amount:N0} đ";

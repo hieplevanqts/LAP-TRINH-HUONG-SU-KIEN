@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Drawing;
 using System.Drawing.Printing;
 using Guna.UI2.WinForms;
@@ -19,22 +19,27 @@ public sealed class InvoiceDetailsForm : Form
     private readonly Label _lblPaidBy = new();
     private readonly Label _lblMethod = new();
     private readonly Label _lblStatus = new();
+    private readonly Label _lblRoomTotal = new();
+    private readonly Label _lblServiceTotal = new();
     private readonly Label _lblSubtotal = new();
     private readonly Label _lblDiscount = new();
     private readonly Label _lblTax = new();
     private readonly Label _lblTotal = new();
 
-    private readonly Guna2DataGridView _grid = new();
+    private readonly Guna2DataGridView _roomsGrid = new();
+    private readonly Guna2DataGridView _servicesGrid = new();
     private readonly PrintDocument _printDocument = new();
-    private DataTable? _linesTable;
+
+    private DataTable? _roomLines;
+    private DataTable? _serviceLines;
 
     public InvoiceDetailsForm(int invoiceId)
     {
         _invoiceId = invoiceId;
 
         Text = "Chi tiết hóa đơn";
-        Width = 800;
-        Height = 600;
+        Width = 980;
+        Height = 720;
         StartPosition = FormStartPosition.CenterParent;
         BackColor = Color.FromArgb(245, 247, 251);
         Font = new Font("Segoe UI", 9F);
@@ -49,19 +54,13 @@ public sealed class InvoiceDetailsForm : Form
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var headerPanel = BuildHeaderPanel();
-        var footerPanel = BuildFooterPanel();
-
-        ConfigureGrid(_grid);
-
-        layout.Controls.Add(headerPanel, 0, 0);
-        layout.Controls.Add(_grid, 0, 1);
-        layout.Controls.Add(footerPanel, 0, 2);
+        layout.Controls.Add(BuildHeaderPanel(), 0, 0);
+        layout.Controls.Add(BuildContentPanel(), 0, 1);
+        layout.Controls.Add(BuildFooterPanel(), 0, 2);
 
         Controls.Add(layout);
 
         _printDocument.PrintPage += OnPrintPage;
-
         Load += (_, _) => LoadDetails();
     }
 
@@ -75,33 +74,70 @@ public sealed class InvoiceDetailsForm : Form
             Padding = new Padding(12)
         };
 
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180));
+        panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
-        panel.Controls.Add(new Label { Text = "Hóa đơn", AutoSize = true, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
+        ConfigureHeaderValueLabel(_lblInvoiceNo);
+        ConfigureHeaderValueLabel(_lblCustomer);
+        ConfigureHeaderValueLabel(_lblContact);
+        ConfigureHeaderValueLabel(_lblDates);
+        ConfigureHeaderValueLabel(_lblBookedBy);
+        ConfigureHeaderValueLabel(_lblPaidBy);
+        ConfigureHeaderValueLabel(_lblMethod);
+        ConfigureHeaderValueLabel(_lblStatus);
+
+        panel.Controls.Add(new Label { Text = "Mã hóa đơn", AutoSize = true, Font = new Font(Font, FontStyle.Bold) }, 0, 0);
         panel.Controls.Add(_lblInvoiceNo, 1, 0);
-
         panel.Controls.Add(new Label { Text = "Khách hàng", AutoSize = true }, 0, 1);
         panel.Controls.Add(_lblCustomer, 1, 1);
-
         panel.Controls.Add(new Label { Text = "Liên hệ", AutoSize = true }, 0, 2);
         panel.Controls.Add(_lblContact, 1, 2);
-
-        panel.Controls.Add(new Label { Text = "Ngày ở", AutoSize = true }, 0, 3);
+        panel.Controls.Add(new Label { Text = "Thời gian thuê", AutoSize = true }, 0, 3);
         panel.Controls.Add(_lblDates, 1, 3);
-
         panel.Controls.Add(new Label { Text = "Nhân viên đặt", AutoSize = true }, 0, 4);
         panel.Controls.Add(_lblBookedBy, 1, 4);
-
         panel.Controls.Add(new Label { Text = "Nhân viên thu", AutoSize = true }, 0, 5);
         panel.Controls.Add(_lblPaidBy, 1, 5);
-
-        panel.Controls.Add(new Label { Text = "Thanh toán", AutoSize = true }, 0, 6);
+        panel.Controls.Add(new Label { Text = "Phương thức thanh toán", AutoSize = true }, 0, 6);
         panel.Controls.Add(_lblMethod, 1, 6);
-
         panel.Controls.Add(new Label { Text = "Trạng thái", AutoSize = true }, 0, 7);
         panel.Controls.Add(_lblStatus, 1, 7);
 
+        return panel;
+    }
+
+    private Control BuildContentPanel()
+    {
+        var panel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(10)
+        };
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 55));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 45));
+
+        var roomsGroup = new Guna2GroupBox
+        {
+            Text = "Tiền phòng",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8)
+        };
+        ConfigureGrid(_roomsGrid);
+        roomsGroup.Controls.Add(_roomsGrid);
+
+        var servicesGroup = new Guna2GroupBox
+        {
+            Text = "Dịch vụ đã sử dụng",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8)
+        };
+        ConfigureGrid(_servicesGrid);
+        servicesGroup.Controls.Add(_servicesGrid);
+
+        panel.Controls.Add(roomsGroup, 0, 0);
+        panel.Controls.Add(servicesGroup, 0, 1);
         return panel;
     }
 
@@ -114,33 +150,34 @@ public sealed class InvoiceDetailsForm : Form
             AutoSize = true,
             Padding = new Padding(12)
         };
-
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
 
-        panel.Controls.Add(new Label { Text = "Tạm tính", AutoSize = true }, 0, 0);
-        panel.Controls.Add(_lblSubtotal, 1, 0);
+        panel.Controls.Add(new Label { Text = "Tiền phòng", AutoSize = true }, 0, 0);
+        panel.Controls.Add(_lblRoomTotal, 1, 0);
+        panel.Controls.Add(new Label { Text = "Tiền dịch vụ", AutoSize = true }, 0, 1);
+        panel.Controls.Add(_lblServiceTotal, 1, 1);
+        panel.Controls.Add(new Label { Text = "Tạm tính", AutoSize = true }, 0, 2);
+        panel.Controls.Add(_lblSubtotal, 1, 2);
+        panel.Controls.Add(new Label { Text = "Giảm giá", AutoSize = true }, 0, 3);
+        panel.Controls.Add(_lblDiscount, 1, 3);
+        panel.Controls.Add(new Label { Text = "Thuế", AutoSize = true }, 0, 4);
+        panel.Controls.Add(_lblTax, 1, 4);
+        panel.Controls.Add(new Label { Text = "Tổng thanh toán", AutoSize = true, Font = new Font(Font, FontStyle.Bold) }, 0, 5);
+        panel.Controls.Add(_lblTotal, 1, 5);
 
-        panel.Controls.Add(new Label { Text = "Giảm giá", AutoSize = true }, 0, 1);
-        panel.Controls.Add(_lblDiscount, 1, 1);
-
-        panel.Controls.Add(new Label { Text = "Thuế", AutoSize = true }, 0, 2);
-        panel.Controls.Add(_lblTax, 1, 2);
-
-        panel.Controls.Add(new Label { Text = "Tổng cộng", AutoSize = true, Font = new Font(Font, FontStyle.Bold) }, 0, 3);
-        panel.Controls.Add(_lblTotal, 1, 3);
-
-        var btnPrint = CreatePrimaryButton("In");
+        var btnPrint = CreatePrimaryButton("In bill");
         btnPrint.Click += (_, _) => PrintInvoice();
         var btnClose = CreateSecondaryButton("Đóng");
         btnClose.Click += (_, _) => Close();
-        panel.Controls.Add(btnPrint, 0, 4);
-        panel.Controls.Add(btnClose, 1, 4);
+
+        panel.Controls.Add(btnPrint, 0, 6);
+        panel.Controls.Add(btnClose, 1, 6);
 
         return panel;
     }
 
-    private void ConfigureGrid(Guna2DataGridView grid)
+    private static void ConfigureGrid(Guna2DataGridView grid)
     {
         grid.Dock = DockStyle.Fill;
         grid.ReadOnly = true;
@@ -154,10 +191,33 @@ public sealed class InvoiceDetailsForm : Form
         grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(45, 108, 223);
         grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
         grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        grid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
         grid.DefaultCellStyle.BackColor = Color.White;
         grid.DefaultCellStyle.ForeColor = Color.FromArgb(33, 37, 41);
+        grid.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
         grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(231, 240, 255);
         grid.DefaultCellStyle.SelectionForeColor = Color.FromArgb(33, 37, 41);
+    }
+
+    private static void ConfigureHeaderValueLabel(Label label)
+    {
+        label.AutoSize = true;
+        label.MaximumSize = new Size(720, 0);
+        label.Margin = new Padding(3, 4, 3, 4);
+    }
+
+    private static Guna2Button CreatePrimaryButton(string text)
+    {
+        return new Guna2Button
+        {
+            Text = text,
+            Width = 120,
+            Height = 36,
+            BorderRadius = 8,
+            FillColor = Color.FromArgb(45, 108, 223),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+        };
     }
 
     private static Guna2Button CreateSecondaryButton(string text)
@@ -165,7 +225,7 @@ public sealed class InvoiceDetailsForm : Form
         return new Guna2Button
         {
             Text = text,
-            Width = 110,
+            Width = 120,
             Height = 36,
             BorderRadius = 8,
             FillColor = Color.FromArgb(233, 236, 239),
@@ -184,47 +244,89 @@ public sealed class InvoiceDetailsForm : Form
             return;
         }
 
-        _lblInvoiceNo.Text = $"# {header["InvoiceId"]} - Đặt phòng {header["BookingId"]}";
+        _lblInvoiceNo.Text = $"# {_invoiceId} - Đặt phòng {header["BookingId"]}";
         _lblCustomer.Text = header["FullName"].ToString();
         _lblContact.Text = $"{header["Phone"]} | {header["Email"]}";
-        _lblDates.Text = $"{Convert.ToDateTime(header["CheckInDate"]):d} - {Convert.ToDateTime(header["CheckOutDate"]):d}";
+        _lblDates.Text = $"{Convert.ToDateTime(header["CheckInDate"]):dd/MM/yyyy} - {Convert.ToDateTime(header["CheckOutDate"]):dd/MM/yyyy}";
         _lblBookedBy.Text = FormatEmployee(header["BookedByEmployeeId"], header["BookedByEmployeeName"], "Không rõ");
         _lblPaidBy.Text = FormatEmployee(header["PaidByEmployeeId"], header["PaidByEmployeeName"], "Không rõ");
-        _lblMethod.Text = $"{MapPaymentMethod(header["PaymentMethod"]?.ToString())} | {Convert.ToDateTime(header["InvoiceDate"]):g}";
+        _lblMethod.Text = MapPaymentMethod(header["PaymentMethod"]?.ToString());
         _lblStatus.Text = MapInvoiceStatus(header["Status"]?.ToString());
 
-        _lblSubtotal.Text = FormatMoney(Convert.ToDecimal(header["Subtotal"]));
-        _lblDiscount.Text = FormatMoney(Convert.ToDecimal(header["Discount"]));
-        _lblTax.Text = FormatMoney(Convert.ToDecimal(header["Tax"]));
-        _lblTotal.Text = FormatMoney(Convert.ToDecimal(header["Total"]));
+        _roomLines = _invoiceService.GetInvoiceRoomLines(_invoiceId);
+        _serviceLines = _invoiceService.GetInvoiceServiceLines(_invoiceId);
+        _roomsGrid.DataSource = _roomLines;
+        _servicesGrid.DataSource = _serviceLines;
 
-        _linesTable = _invoiceService.GetInvoiceRoomLines(_invoiceId);
-        _grid.DataSource = _linesTable;
+        if (_roomsGrid.Columns["RoomNumber"] is { } roomNumber)
+        {
+            roomNumber.HeaderText = "Phòng";
+            roomNumber.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            roomNumber.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        }
+        if (_roomsGrid.Columns["TypeName"] is { } typeName)
+        {
+            typeName.HeaderText = "Loại phòng";
+        }
+        if (_roomsGrid.Columns["PricePerNight"] is { } price)
+        {
+            price.HeaderText = "Giá/đêm";
+            price.DefaultCellStyle.Format = "N0";
+            price.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            price.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+        }
+        if (_roomsGrid.Columns["Nights"] is { } nights)
+        {
+            nights.HeaderText = "Số đêm";
+            nights.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            nights.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        }
+        if (_roomsGrid.Columns["LineTotal"] is { } roomAmount)
+        {
+            roomAmount.HeaderText = "Thành tiền";
+            roomAmount.DefaultCellStyle.Format = "N0";
+            roomAmount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            roomAmount.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+        }
 
-        if (_grid.Columns["RoomNumber"] is { } roomNumberColumn)
+        if (_servicesGrid.Columns["ServiceName"] is { } serviceName)
         {
-            roomNumberColumn.HeaderText = "Số phòng";
+            serviceName.HeaderText = "Dịch vụ";
         }
-        if (_grid.Columns["TypeName"] is { } typeNameColumn)
+        if (_servicesGrid.Columns["Quantity"] is { } qty)
         {
-            typeNameColumn.HeaderText = "Loại phòng";
+            qty.HeaderText = "Số lượng";
+            qty.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            qty.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
         }
-        if (_grid.Columns["PricePerNight"] is { } priceColumn)
+        if (_servicesGrid.Columns["UnitPrice"] is { } unitPrice)
         {
-            priceColumn.HeaderText = "Giá/đêm";
-            priceColumn.DefaultCellStyle.Format = "N0";
-            priceColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            unitPrice.HeaderText = "Đơn giá";
+            unitPrice.DefaultCellStyle.Format = "N0";
+            unitPrice.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            unitPrice.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
-        if (_grid.Columns["Nights"] is { } nightsColumn)
+        if (_servicesGrid.Columns["Amount"] is { } serviceAmount)
         {
-            nightsColumn.HeaderText = "Số đêm";
+            serviceAmount.HeaderText = "Thành tiền";
+            serviceAmount.DefaultCellStyle.Format = "N0";
+            serviceAmount.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            serviceAmount.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
-        if (_grid.Columns["LineTotal"] is { } lineTotalColumn)
-        {
-            lineTotalColumn.HeaderText = "Thành tiền";
-            lineTotalColumn.DefaultCellStyle.Format = "N0";
-            lineTotalColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-        }
+
+        var roomTotal = SumColumn(_roomLines, "LineTotal");
+        var serviceTotal = SumColumn(_serviceLines, "Amount");
+        var subtotal = Convert.ToDecimal(header["Subtotal"]);
+        var discount = Convert.ToDecimal(header["Discount"]);
+        var tax = Convert.ToDecimal(header["Tax"]);
+        var total = Convert.ToDecimal(header["Total"]);
+
+        _lblRoomTotal.Text = FormatMoney(roomTotal);
+        _lblServiceTotal.Text = FormatMoney(serviceTotal);
+        _lblSubtotal.Text = FormatMoney(subtotal);
+        _lblDiscount.Text = FormatMoney(discount);
+        _lblTax.Text = FormatMoney(tax);
+        _lblTotal.Text = FormatMoney(total);
     }
 
     private void PrintInvoice()
@@ -254,60 +356,50 @@ public sealed class InvoiceDetailsForm : Form
         using var boldFont = new Font("Segoe UI", 9F, FontStyle.Bold);
         using var regularFont = new Font("Segoe UI", 9F);
 
-        g.DrawString("HÓA ĐƠN", titleFont, Brushes.Black, left, top);
+        g.DrawString("HÓA ĐƠN THANH TOÁN", titleFont, Brushes.Black, left, top);
         top += lineHeight * 2;
 
-        g.DrawString($"Mã: {_lblInvoiceNo.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
+        g.DrawString($"Mã hóa đơn: {_lblInvoiceNo.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Khách hàng: {_lblCustomer.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Liên hệ: {_lblContact.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
-        g.DrawString($"Ngày ở: {_lblDates.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
+        g.DrawString($"Thời gian thuê: {_lblDates.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Nhân viên đặt: {_lblBookedBy.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Nhân viên thu: {_lblPaidBy.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
-        g.DrawString($"Thanh toán: {_lblMethod.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
+        g.DrawString($"Phương thức: {_lblMethod.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Trạng thái: {_lblStatus.Text}", regularFont, Brushes.Black, left, top); top += lineHeight * 2;
 
-        g.DrawString("CHI TIẾT PHÒNG", boldFont, Brushes.Black, left, top);
+        g.DrawString("TIỀN PHÒNG", boldFont, Brushes.Black, left, top);
         top += lineHeight;
-
-        g.DrawString("Số phòng", boldFont, Brushes.Black, left, top);
-        g.DrawString("Loại", boldFont, Brushes.Black, left + 120, top);
-        g.DrawString("Giá/đêm", boldFont, Brushes.Black, left + 320, top);
-        g.DrawString("Số đêm", boldFont, Brushes.Black, left + 420, top);
-        g.DrawString("Thành tiền", boldFont, Brushes.Black, left + 520, top);
-        top += lineHeight;
-
-        if (_linesTable is not null)
+        if (_roomLines is not null)
         {
-            foreach (DataRow row in _linesTable.Rows)
+            foreach (DataRow row in _roomLines.Rows)
             {
-                g.DrawString(row["RoomNumber"].ToString(), regularFont, Brushes.Black, left, top);
-                g.DrawString(row["TypeName"].ToString(), regularFont, Brushes.Black, left + 120, top);
-                g.DrawString(FormatMoney(Convert.ToDecimal(row["PricePerNight"])), regularFont, Brushes.Black, left + 320, top);
-                g.DrawString(row["Nights"].ToString(), regularFont, Brushes.Black, left + 420, top);
-                g.DrawString(FormatMoney(Convert.ToDecimal(row["LineTotal"])), regularFont, Brushes.Black, left + 520, top);
+                var text = $"{row["RoomNumber"]} - {row["TypeName"]}: {FormatMoney(Convert.ToDecimal(row["LineTotal"]))}";
+                g.DrawString(text, regularFont, Brushes.Black, left, top);
                 top += lineHeight;
             }
         }
 
         top += lineHeight;
+        g.DrawString("DỊCH VỤ", boldFont, Brushes.Black, left, top);
+        top += lineHeight;
+        if (_serviceLines is not null)
+        {
+            foreach (DataRow row in _serviceLines.Rows)
+            {
+                var text = $"{row["ServiceName"]} x {row["Quantity"]}: {FormatMoney(Convert.ToDecimal(row["Amount"]))}";
+                g.DrawString(text, regularFont, Brushes.Black, left, top);
+                top += lineHeight;
+            }
+        }
+
+        top += lineHeight;
+        g.DrawString($"Tiền phòng: {_lblRoomTotal.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
+        g.DrawString($"Tiền dịch vụ: {_lblServiceTotal.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Tạm tính: {_lblSubtotal.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Giảm giá: {_lblDiscount.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
         g.DrawString($"Thuế: {_lblTax.Text}", regularFont, Brushes.Black, left, top); top += lineHeight;
-        g.DrawString($"Tổng cộng: {_lblTotal.Text}", boldFont, Brushes.Black, left, top);
-    }
-
-    private static Guna2Button CreatePrimaryButton(string text)
-    {
-        return new Guna2Button
-        {
-            Text = text,
-            Width = 110,
-            Height = 36,
-            BorderRadius = 8,
-            FillColor = Color.FromArgb(45, 108, 223),
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 9F, FontStyle.Bold)
-        };
+        g.DrawString($"Tổng thanh toán: {_lblTotal.Text}", boldFont, Brushes.Black, left, top);
     }
 
     private static string MapInvoiceStatus(string? status)
@@ -341,6 +433,26 @@ public sealed class InvoiceDetailsForm : Form
         var id = Convert.ToInt32(employeeId);
         var name = employeeName.ToString();
         return string.IsNullOrWhiteSpace(name) ? fallback : $"NV{id:D4} - {name}";
+    }
+
+    private static decimal SumColumn(DataTable? table, string columnName)
+    {
+        if (table is null || !table.Columns.Contains(columnName))
+        {
+            return 0;
+        }
+
+        decimal sum = 0;
+        foreach (DataRow row in table.Rows)
+        {
+            if (row[columnName] == DBNull.Value)
+            {
+                continue;
+            }
+
+            sum += Convert.ToDecimal(row[columnName]);
+        }
+        return sum;
     }
 
     private static string FormatMoney(decimal amount) => $"{amount:N0} đ";

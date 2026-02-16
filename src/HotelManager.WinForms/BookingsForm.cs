@@ -18,7 +18,7 @@ public sealed class BookingsForm : Form
     private readonly Guna2NumericUpDown _numAdults = new();
     private readonly Guna2NumericUpDown _numChildren = new();
     private readonly CheckedListBox _roomsList = new();
-    private readonly Guna2CheckBox _chkOnlyAvailable = new() { Text = "Chá»‰ hiá»‡n phÃ²ng trá»‘ng", Checked = true, AutoSize = true };
+    private readonly Guna2CheckBox _chkOnlyAvailable = new() { Text = "Chỉ hiển phòng trống", Checked = true, AutoSize = true };
     private readonly Guna2ComboBox _cbService = new();
     private readonly Guna2NumericUpDown _numServiceQty = new();
     private readonly ListBox _selectedServicesList = new();
@@ -28,7 +28,7 @@ public sealed class BookingsForm : Form
     public BookingsForm(LoginResult loginInfo)
     {
         _loginInfo = loginInfo;
-        Text = "Äáº·t phÃ²ng";
+        Text = "Đặt phòng";
         Width = 900;
         Height = 600;
         StartPosition = FormStartPosition.CenterParent;
@@ -81,25 +81,25 @@ public sealed class BookingsForm : Form
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
         panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30));
 
-        panel.Controls.Add(new Label { Text = "KhÃ¡ch hÃ ng", AutoSize = true }, 0, 0);
+        panel.Controls.Add(new Label { Text = "Khách hàng", AutoSize = true }, 0, 0);
         StyleComboBox(_cbCustomer);
         _cbCustomer.Dock = DockStyle.Fill;
         panel.Controls.Add(_cbCustomer, 1, 0);
-        panel.Controls.Add(new Label { Text = "Nháº­n phÃ²ng", AutoSize = true }, 2, 0);
+        panel.Controls.Add(new Label { Text = "Nhận phòng", AutoSize = true }, 2, 0);
         StyleDatePicker(_dtCheckIn);
         _dtCheckIn.Dock = DockStyle.Fill;
         panel.Controls.Add(_dtCheckIn, 3, 0);
 
-        panel.Controls.Add(new Label { Text = "Tráº£ phÃ²ng", AutoSize = true }, 0, 1);
+        panel.Controls.Add(new Label { Text = "Trả phòng", AutoSize = true }, 0, 1);
         StyleDatePicker(_dtCheckOut);
         _dtCheckOut.Dock = DockStyle.Fill;
         panel.Controls.Add(_dtCheckOut, 1, 1);
-        panel.Controls.Add(new Label { Text = "NgÆ°á»i lá»›n", AutoSize = true }, 2, 1);
+        panel.Controls.Add(new Label { Text = "Người lớn", AutoSize = true }, 2, 1);
         StyleNumeric(_numAdults);
         _numAdults.Dock = DockStyle.Fill;
         panel.Controls.Add(_numAdults, 3, 1);
 
-        panel.Controls.Add(new Label { Text = "Tráº» em", AutoSize = true }, 0, 2);
+        panel.Controls.Add(new Label { Text = "Trẻ em", AutoSize = true }, 0, 2);
         StyleNumeric(_numChildren);
         _numChildren.Dock = DockStyle.Fill;
         panel.Controls.Add(_numChildren, 1, 2);
@@ -128,7 +128,7 @@ public sealed class BookingsForm : Form
     {
         var panel = new Guna2GroupBox
         {
-            Text = "Chá»n phÃ²ng",
+            Text = "Chọn phòng",
             Dock = DockStyle.Fill,
             Padding = new Padding(10)
         };
@@ -160,7 +160,7 @@ public sealed class BookingsForm : Form
     {
         var panel = new Guna2GroupBox
         {
-            Text = "Chá»n dá»‹ch vá»¥",
+            Text = "Chọn dịch vụ",
             Dock = DockStyle.Fill,
             Padding = new Padding(10)
         };
@@ -189,17 +189,17 @@ public sealed class BookingsForm : Form
         _numServiceQty.Maximum = 1000;
         _numServiceQty.Value = 1;
 
-        var btnAdd = CreatePrimaryButton("ThÃªm dá»‹ch vá»¥");
+        var btnAdd = CreatePrimaryButton("Thêm dịch vụ");
         btnAdd.Width = 140;
         btnAdd.Click += (_, _) => AddServiceSelection();
 
-        var btnRemove = CreateSecondaryButton("XÃ³a");
+        var btnRemove = CreateSecondaryButton("Xóa");
         btnRemove.Width = 80;
         btnRemove.Click += (_, _) => RemoveServiceSelection();
 
-        topRow.Controls.Add(new Label { Text = "Dá»‹ch vá»¥", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
+        topRow.Controls.Add(new Label { Text = "Dịch vụ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
         topRow.Controls.Add(_cbService);
-        topRow.Controls.Add(new Label { Text = "Sá»‘ lÆ°á»£ng", AutoSize = true, Padding = new Padding(10, 8, 0, 0) });
+        topRow.Controls.Add(new Label { Text = "Số lượng", AutoSize = true, Padding = new Padding(10, 8, 0, 0) });
         topRow.Controls.Add(_numServiceQty);
         topRow.Controls.Add(btnAdd);
         topRow.Controls.Add(btnRemove);
@@ -222,8 +222,8 @@ public sealed class BookingsForm : Form
             AutoSize = true
         };
 
-        var btnCreate = CreatePrimaryButton("Äáº·t phÃ²ng");
-        var btnRefresh = CreateSecondaryButton("Táº£i láº¡i");
+        var btnCreate = CreatePrimaryButton("Đặt phòng");
+        var btnRefresh = CreateSecondaryButton("Tải lại");
 
         btnCreate.Click += (_, _) => CreateBooking();
         btnRefresh.Click += (_, _) =>
@@ -430,13 +430,13 @@ public sealed class BookingsForm : Form
     {
         if (_cbCustomer.SelectedValue is not int customerId)
         {
-            MessageBox.Show("Chá»n khÃ¡ch hÃ ng.", "ThÃ´ng bÃ¡o", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Chọn khách hàng.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
         if (_dtCheckOut.Value.Date <= _dtCheckIn.Value.Date)
         {
-            MessageBox.Show("NgÃ y tráº£ phÃ²ng pháº£i sau ngÃ y nháº­n phÃ²ng.", "ThÃ´ng bÃ¡o", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Ngày trả phòng phải sau ngày nhận phòng.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -447,7 +447,7 @@ public sealed class BookingsForm : Form
 
         if (selectedRoomIds.Count == 0)
         {
-            MessageBox.Show("Chá»n Ã­t nháº¥t 1 phÃ²ng.", "ThÃ´ng bÃ¡o", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Chọn ít nhất 1 phòng.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
@@ -465,7 +465,7 @@ public sealed class BookingsForm : Form
                 services
             );
 
-            MessageBox.Show("Äáº·t phÃ²ng thÃ nh cÃ´ng.", "ThÃ´ng bÃ¡o", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Đặt phòng thành công.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
             LoadRooms();
             _selectedServices.Clear();
             RefreshSelectedServicesList();
@@ -473,7 +473,7 @@ public sealed class BookingsForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Äáº·t phÃ²ng tháº¥t báº¡i: {ex.Message}", "Lá»—i", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"Đặt phòng thất bại: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -495,9 +495,9 @@ public sealed class BookingsForm : Form
     {
         return status switch
         {
-            "Available" => "Trá»‘ng",
-            "Occupied" => "Äang á»Ÿ",
-            "Maintenance" => "Báº£o trÃ¬",
+            "Available" => "Trống",
+            "Occupied" => "Đang ở",
+            "Maintenance" => "Bảo trì",
             _ => status ?? string.Empty
         };
     }
@@ -515,7 +515,7 @@ public sealed class BookingsForm : Form
         public string Name { get; }
         public decimal Price { get; }
 
-        public string Display => $"{Name} ({Price:N0} Ä‘)";
+        public string Display => $"{Name} ({Price:N0} đ)";
     }
 
     private sealed class ServiceDisplay

@@ -88,4 +88,19 @@ ORDER BY r.RoomNumber;";
 
         return Db.ExecuteQuery(sql, new SqlParameter("@InvoiceId", invoiceId));
     }
+
+    public DataTable GetInvoiceServiceLines(int invoiceId)
+    {
+        const string sql = @"
+SELECT s.ServiceName,
+       su.Quantity,
+       su.UnitPrice,
+       su.Quantity * su.UnitPrice AS Amount
+FROM ServiceUsages su
+JOIN Services s ON s.ServiceId = su.ServiceId
+WHERE su.BookingId = (SELECT BookingId FROM Invoices WHERE InvoiceId = @InvoiceId)
+ORDER BY su.ServiceUsageId;";
+
+        return Db.ExecuteQuery(sql, new SqlParameter("@InvoiceId", invoiceId));
+    }
 }

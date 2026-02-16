@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
+using System.Linq;
 using Guna.UI2.WinForms;
 using HotelManager.BLL;
 
@@ -10,7 +12,11 @@ public sealed class PaymentsForm : Form
     public event EventHandler? PaymentCompleted;
 
     private readonly PaymentService _paymentService = new();
+    private readonly ServiceService _serviceService = new();
     private readonly Guna2DataGridView _grid = new();
+    private readonly Guna2ComboBox _cbService = new();
+    private readonly Guna2NumericUpDown _numServiceQty = new();
+    private readonly ListBox _selectedServicesList = new();
     private readonly Guna2NumericUpDown _numDiscount = new();
     private readonly Guna2NumericUpDown _numTax = new();
     private readonly Guna2ComboBox _cbMethod = new();
@@ -32,10 +38,11 @@ public sealed class PaymentsForm : Form
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            RowCount = 3,
+            RowCount = 4,
             ColumnCount = 1
         };
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 60));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 52));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
@@ -50,16 +57,104 @@ public sealed class PaymentsForm : Form
         };
         _grid.CellClick += (_, _) => LoadSelectedBooking();
 
+        var servicesPanel = BuildServicesPanel();
         var inputPanel = BuildInputPanel();
         var buttonPanel = BuildButtonPanel();
 
         layout.Controls.Add(_grid, 0, 0);
-        layout.Controls.Add(inputPanel, 0, 1);
-        layout.Controls.Add(buttonPanel, 0, 2);
+        layout.Controls.Add(servicesPanel, 0, 1);
+        layout.Controls.Add(inputPanel, 0, 2);
+        layout.Controls.Add(buttonPanel, 0, 3);
 
         Controls.Add(layout);
 
-        Load += (_, _) => LoadBookings();
+        Load += (_, _) =>
+        {
+            LoadServiceOptions();
+            LoadBookings();
+        };
+    }
+
+    public void RefreshData()
+    {
+        LoadBookings(_selectedBookingId);
+    }
+
+    private Control BuildServicesPanel()
+    {
+        var panel = new Guna2GroupBox
+        {
+            Text = "Dịch vụ phát sinh",
+            Dock = DockStyle.Fill,
+            Padding = new Padding(10)
+        };
+
+        var container = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+            ColumnCount = 1
+        };
+        container.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        container.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var topRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            Padding = new Padding(0, 0, 0, 6)
+        };
+
+        StyleComboBox(_cbService);
+        _cbService.Width = 280;
+
+        StyleNumeric(_numServiceQty);
+        _numServiceQty.Width = 120;
+        _numServiceQty.Minimum = 1;
+        _numServiceQty.Maximum = 1000;
+        _numServiceQty.Value = 1;
+
+        var btnAddService = CreateSecondaryButton("Thêm dịch vụ");
+        btnAddService.Width = 140;
+        btnAddService.Click += (_, _) => AddServiceToSelectedBooking();
+
+        topRow.Controls.Add(new Label { Text = "Dịch vụ", AutoSize = true, Padding = new Padding(0, 8, 0, 0) });
+        topRow.Controls.Add(_cbService);
+        topRow.Controls.Add(new Label { Text = "Số lượng", AutoSize = true, Padding = new Padding(10, 8, 0, 0) });
+        topRow.Controls.Add(_numServiceQty);
+        topRow.Controls.Add(btnAddService);
+
+        _selectedServicesList.Dock = DockStyle.Fill;
+        _selectedServicesList.BorderStyle = BorderStyle.None;
+
+        container.Controls.Add(topRow, 0, 0);
+        container.Controls.Add(_selectedServicesList, 0, 1);
+        panel.Controls.Add(container);
+
+        return panel;
+    }
+
+    private void LoadServiceOptions()
+    {
+        var data = _serviceService.GetServices(true);
+        var options = new List<ServiceOption>();
+        foreach (DataRow row in data.Rows)
+        {
+            options.Add(new ServiceOption(
+                Convert.ToInt32(row["ServiceId"]),
+                row["ServiceName"].ToString() ?? string.Empty,
+                Convert.ToDecimal(row["UnitPrice"])
+            ));
+        }
+
+        _cbService.DataSource = options;
+        _cbService.DisplayMember = nameof(ServiceOption.Display);
+        _cbService.ValueMember = nameof(ServiceOption.ServiceId);
+
+        if (_cbService.Items.Count > 0)
+        {
+            _cbService.SelectedIndex = 0;
+        }
     }
 
     private Control BuildInputPanel()
@@ -143,7 +238,7 @@ public sealed class PaymentsForm : Form
         btnInfo.Width = 200;
 
         btnPay.Click += (_, _) => Pay();
-        btnRefresh.Click += (_, _) => LoadBookings();
+        btnRefresh.Click += (_, _) => LoadBookings(_selectedBookingId);
         btnInfo.Click += (_, _) => new PaymentInfoForm().ShowDialog(this);
 
         panel.Controls.Add(btnPay);
@@ -153,7 +248,7 @@ public sealed class PaymentsForm : Form
         return panel;
     }
 
-    private void LoadBookings()
+    private void LoadBookings(int? bookingIdToSelect = null)
     {
         _grid.DataSource = _paymentService.GetBookingsForPayment();
         if (_grid.Columns["BookingId"] is { } idColumn)
@@ -181,10 +276,16 @@ public sealed class PaymentsForm : Form
             subtotalColumn.HeaderText = "Tạm tính";
         }
 
+        if (bookingIdToSelect.HasValue && TrySelectBooking(bookingIdToSelect.Value))
+        {
+            return;
+        }
+
         _selectedBookingId = null;
         _currentSubtotal = 0;
         _numDiscount.Value = 0;
         _numTax.Value = 0;
+        _selectedServicesList.Items.Clear();
         UpdateTotals();
     }
 
@@ -278,7 +379,82 @@ public sealed class PaymentsForm : Form
             var row = rowView.Row;
             _selectedBookingId = Convert.ToInt32(row["BookingId"]);
             _currentSubtotal = Convert.ToDecimal(row["Subtotal"]);
+            LoadServiceUsages(_selectedBookingId.Value);
             UpdateTotals();
+        }
+    }
+
+    private bool TrySelectBooking(int bookingId)
+    {
+        foreach (DataGridViewRow row in _grid.Rows)
+        {
+            if (row.DataBoundItem is not DataRowView rowView)
+            {
+                continue;
+            }
+
+            if (Convert.ToInt32(rowView.Row["BookingId"]) != bookingId)
+            {
+                continue;
+            }
+
+            row.Selected = true;
+            _grid.CurrentCell = row.Cells
+                .Cast<DataGridViewCell>()
+                .FirstOrDefault(cell => cell.Visible && (cell.OwningColumn?.Visible ?? false));
+            _selectedBookingId = bookingId;
+            _currentSubtotal = Convert.ToDecimal(rowView.Row["Subtotal"]);
+            LoadServiceUsages(bookingId);
+            UpdateTotals();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void LoadServiceUsages(int bookingId)
+    {
+        _selectedServicesList.Items.Clear();
+        var data = _paymentService.GetBookingServiceUsages(bookingId);
+        foreach (DataRow row in data.Rows)
+        {
+            var serviceName = row["ServiceName"].ToString() ?? string.Empty;
+            var quantity = Convert.ToInt32(row["Quantity"]);
+            var amount = Convert.ToDecimal(row["Amount"]);
+            _selectedServicesList.Items.Add($"{serviceName} x {quantity} - {amount:N0}");
+        }
+    }
+
+    private void AddServiceToSelectedBooking()
+    {
+        if (_selectedBookingId is null)
+        {
+            MessageBox.Show("Chọn đặt phòng trước khi thêm dịch vụ.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        if (_cbService.SelectedItem is not ServiceOption serviceOption)
+        {
+            MessageBox.Show("Không có dịch vụ khả dụng để thêm.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        var quantity = (int)_numServiceQty.Value;
+        if (quantity <= 0)
+        {
+            MessageBox.Show("Số lượng phải lớn hơn 0.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        try
+        {
+            _paymentService.AddServiceUsage(_selectedBookingId.Value, serviceOption.ServiceId, quantity);
+            LoadBookings(_selectedBookingId);
+            MessageBox.Show("Đã thêm dịch vụ vào danh sách của khách hàng.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Không thể thêm dịch vụ: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -330,6 +506,22 @@ public sealed class PaymentsForm : Form
             "Paid" => "Đã thanh toán",
             _ => status ?? string.Empty
         };
+    }
+
+    private sealed class ServiceOption
+    {
+        public ServiceOption(int serviceId, string name, decimal price)
+        {
+            ServiceId = serviceId;
+            Name = name;
+            Price = price;
+        }
+
+        public int ServiceId { get; }
+        public string Name { get; }
+        public decimal Price { get; }
+
+        public string Display => $"{Name} ({Price:N0})";
     }
 
     private sealed class PaymentMethodOption

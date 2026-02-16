@@ -125,4 +125,82 @@ WHERE BookingId = @BookingId;";
             throw;
         }
     }
+
+    public DataTable GetBookingServiceUsages(int bookingId)
+    {
+        const string sql = @"
+SELECT su.ServiceUsageId,
+       su.ServiceId,
+       s.ServiceName,
+       su.Quantity,
+       su.UnitPrice,
+       su.Quantity * su.UnitPrice AS Amount
+FROM ServiceUsages su
+JOIN Services s ON s.ServiceId = su.ServiceId
+WHERE su.BookingId = @BookingId
+ORDER BY su.ServiceUsageId DESC;";
+
+        return Db.ExecuteQuery(sql, new SqlParameter("@BookingId", bookingId));
+    }
+
+    public void AddServiceUsage(int bookingId, int serviceId, int quantity)
+    {
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be greater than 0.");
+        }
+
+        using var connection = Db.GetOpenConnection();
+        using var transaction = connection.BeginTransaction();
+
+        try
+        {
+            const string validateBookingSql = @"
+SELECT COUNT(1)
+FROM Bookings
+WHERE BookingId = @BookingId
+  AND Status = N'Pending';";
+
+            using var validateBookingCmd = new SqlCommand(validateBookingSql, connection, transaction);
+            validateBookingCmd.Parameters.AddWithValue("@BookingId", bookingId);
+            var bookingExists = Convert.ToInt32(validateBookingCmd.ExecuteScalar()) > 0;
+            if (!bookingExists)
+            {
+                throw new InvalidOperationException("Chỉ có thể thêm dịch vụ cho đặt phòng đang chờ thanh toán.");
+            }
+
+            const string validateServiceSql = @"
+SELECT COUNT(1)
+FROM Services
+WHERE ServiceId = @ServiceId
+  AND IsActive = 1;";
+
+            using var validateServiceCmd = new SqlCommand(validateServiceSql, connection, transaction);
+            validateServiceCmd.Parameters.AddWithValue("@ServiceId", serviceId);
+            var serviceExists = Convert.ToInt32(validateServiceCmd.ExecuteScalar()) > 0;
+            if (!serviceExists)
+            {
+                throw new InvalidOperationException("Dịch vụ không tồn tại hoặc đã ngưng áp dụng.");
+            }
+
+            const string insertSql = @"
+INSERT INTO ServiceUsages (BookingId, ServiceId, Quantity, UnitPrice)
+SELECT @BookingId, s.ServiceId, @Quantity, s.UnitPrice
+FROM Services s
+WHERE s.ServiceId = @ServiceId;";
+
+            using var insertCmd = new SqlCommand(insertSql, connection, transaction);
+            insertCmd.Parameters.AddWithValue("@BookingId", bookingId);
+            insertCmd.Parameters.AddWithValue("@ServiceId", serviceId);
+            insertCmd.Parameters.AddWithValue("@Quantity", quantity);
+            insertCmd.ExecuteNonQuery();
+
+            transaction.Commit();
+        }
+        catch
+        {
+            transaction.Rollback();
+            throw;
+        }
+    }
 }

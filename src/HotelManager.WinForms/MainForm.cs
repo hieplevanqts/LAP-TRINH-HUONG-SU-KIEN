@@ -1,5 +1,6 @@
 using System.Data;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using HotelManager.BLL;
 
 namespace HotelManager.WinForms;
@@ -7,16 +8,23 @@ namespace HotelManager.WinForms;
 public sealed class MainForm : Form
 {
     private readonly BookingService _bookingService = new();
+    private readonly EmployeeProfileService _employeeProfileService = new();
     private readonly DataGridView _bookingGrid = new();
+    private readonly LoginResult _loginInfo;
+    private ToolStripMenuItem? _accountMenu;
     private BookingsForm? _bookingsForm;
     private CustomersForm? _customersForm;
     private PaymentsForm? _paymentsForm;
     private InvoicesForm? _invoicesForm;
     private ReportsForm? _reportsForm;
     private BookingHistoryForm? _bookingHistoryForm;
+    private TabControl? _tabs;
+    public bool RequestRelogin { get; private set; }
 
-    public MainForm()
+    public MainForm(LoginResult loginInfo)
     {
+        _loginInfo = loginInfo;
+
         Text = "Quản lý khách sạn";
         Width = 1200;
         Height = 700;
@@ -53,8 +61,55 @@ public sealed class MainForm : Form
         var settingsMenu = new ToolStripMenuItem("Cài đặt") { ForeColor = Color.White };
         settingsMenu.Click += (_, _) => OpenSettings();
 
+        _accountMenu = new ToolStripMenuItem
+        {
+            Alignment = ToolStripItemAlignment.Right,
+            Image = CreateAvatarImage((string?)null, _loginInfo.FullName),
+            ImageScaling = ToolStripItemImageScaling.None,
+            ToolTipText = $"{_loginInfo.FullName} ({_loginInfo.RoleName})",
+            ForeColor = Color.White
+        };
+
+        var editProfileItem = new ToolStripMenuItem("Chỉnh sửa thông tin");
+        editProfileItem.Click += (_, _) =>
+        {
+            using var form = new EditProfileForm(_loginInfo.EmployeeId);
+            if (form.ShowDialog(this) == DialogResult.OK)
+            {
+                var displayName = string.IsNullOrWhiteSpace(form.UpdatedFullName) ? _loginInfo.FullName : form.UpdatedFullName;
+                if (form.UpdatedAvatarImage is not null)
+                {
+                    ApplyAccountMenuAvatarFromImage(form.UpdatedAvatarImage, displayName);
+                }
+                else
+                {
+                    ApplyAccountMenuAvatar(form.UpdatedAvatarPath, displayName);
+                }
+            }
+        };
+
+        var timeSheetItem = new ToolStripMenuItem("Bảng chấm công");
+        timeSheetItem.Click += (_, _) =>
+        {
+            using var form = new AttendanceForm(_loginInfo.EmployeeId, _loginInfo.FullName);
+            form.ShowDialog(this);
+        };
+
+        var logoutItem = new ToolStripMenuItem("Đăng xuất");
+        logoutItem.Click += (_, _) =>
+        {
+            RequestRelogin = true;
+            Close();
+        };
+
+        _accountMenu.DropDownItems.Add(editProfileItem);
+        _accountMenu.DropDownItems.Add(timeSheetItem);
+        _accountMenu.DropDownItems.Add(new ToolStripSeparator());
+        _accountMenu.DropDownItems.Add(logoutItem);
+
         menu.Items.Add(masterMenu);
         menu.Items.Add(settingsMenu);
+        menu.Items.Add(_accountMenu);
 
         foreach (ToolStripItem item in menu.Items)
         {
@@ -64,6 +119,7 @@ public sealed class MainForm : Form
             }
         }
 
+        RefreshAccountMenuAvatar();
         return menu;
     }
 
@@ -124,13 +180,24 @@ public sealed class MainForm : Form
     private TabControl BuildTabs()
     {
         var tabs = new TabControl { Dock = DockStyle.Fill, Padding = new Point(16, 8) };
+        _tabs = tabs;
 
         var bookingTab = new TabPage("Đặt phòng") { Padding = new Padding(10) };
         _bookingsForm = new BookingsForm();
+        _bookingsForm.BookingCreated += (_, _) => _paymentsForm?.RefreshData();
         EmbedForm(bookingTab, _bookingsForm);
 
         var customerTab = new TabPage("Khách hàng");
         _customersForm = new CustomersForm();
+        _customersForm.CustomerAdded += (_, customerId) =>
+        {
+            if (_tabs is not null)
+            {
+                _tabs.SelectedIndex = 0;
+            }
+
+            _bookingsForm?.RefreshCustomersAndSelect(customerId);
+        };
         EmbedForm(customerTab, _customersForm);
 
         var paymentTab = new TabPage("Thanh toán");
@@ -186,5 +253,123 @@ public sealed class MainForm : Form
     {
         using var form = new SettingsForm();
         form.ShowDialog(this);
+    }
+
+    private void RefreshAccountMenuAvatar()
+    {
+        if (_accountMenu is null)
+        {
+            return;
+        }
+
+        var profile = _employeeProfileService.GetProfile(_loginInfo.EmployeeId);
+        var displayName = string.IsNullOrWhiteSpace(profile?.FullName) ? _loginInfo.FullName : profile!.FullName;
+        var avatarPath = profile?.AvatarPath;
+
+        ApplyAccountMenuAvatar(avatarPath, displayName);
+    }
+
+    private void ApplyAccountMenuAvatar(string? avatarPath, string displayName)
+    {
+        if (_accountMenu is null)
+        {
+            return;
+        }
+
+        if (_accountMenu.Image is Image oldImage)
+        {
+            _accountMenu.Image = null;
+            oldImage.Dispose();
+        }
+
+        _accountMenu.Image = CreateAvatarImage(avatarPath, displayName);
+        _accountMenu.ToolTipText = $"{displayName} ({_loginInfo.RoleName})";
+        _accountMenu.Owner?.Invalidate();
+    }
+
+    private void ApplyAccountMenuAvatarFromImage(Image sourceImage, string displayName)
+    {
+        if (_accountMenu is null)
+        {
+            return;
+        }
+
+        if (_accountMenu.Image is Image oldImage)
+        {
+            _accountMenu.Image = null;
+            oldImage.Dispose();
+        }
+
+        _accountMenu.Image = CreateAvatarImage(sourceImage, displayName);
+        _accountMenu.ToolTipText = $"{displayName} ({_loginInfo.RoleName})";
+        _accountMenu.Owner?.Invalidate();
+    }
+
+    private static Bitmap CreateAvatarImage(string? avatarPath, string fullName)
+    {
+        if (!string.IsNullOrWhiteSpace(avatarPath) && File.Exists(avatarPath))
+        {
+            try
+            {
+                using var source = Image.FromFile(avatarPath);
+                return CreateAvatarImage(source, fullName);
+            }
+            catch
+            {
+                // Fallback to initials avatar
+            }
+        }
+
+        return CreateAvatarImage((Image?)null, fullName);
+    }
+
+    private static Bitmap CreateAvatarImage(Image? sourceImage, string fullName)
+    {
+        var bmp = new Bitmap(24, 24);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(Color.Transparent);
+        using var path = new GraphicsPath();
+        path.AddEllipse(0, 0, 23, 23);
+        g.SetClip(path);
+
+        if (sourceImage is not null)
+        {
+            g.DrawImage(sourceImage, new Rectangle(0, 0, 24, 24));
+            return bmp;
+        }
+
+        var initials = GetInitials(fullName);
+        using var bgBrush = new SolidBrush(Color.FromArgb(16, 54, 133));
+        g.FillEllipse(bgBrush, 0, 0, 23, 23);
+
+        using var textBrush = new SolidBrush(Color.White);
+        using var font = new Font("Segoe UI", 8.5F, FontStyle.Bold, GraphicsUnit.Point);
+        var rect = new RectangleF(0, 0, 24, 24);
+        var format = new StringFormat
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center
+        };
+        g.DrawString(initials, font, textBrush, rect, format);
+
+        return bmp;
+    }
+
+    private static string GetInitials(string fullName)
+    {
+        var parts = fullName
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[^1][0])}";
+        }
+
+        if (parts.Length == 1 && parts[0].Length > 0)
+        {
+            return char.ToUpperInvariant(parts[0][0]).ToString();
+        }
+
+        return "U";
     }
 }

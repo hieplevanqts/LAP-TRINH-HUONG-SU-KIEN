@@ -15,6 +15,7 @@ public sealed class CustomersForm : Form
     private readonly Guna2TextBox _txtIdNumber = new();
     private readonly Guna2TextBox _txtAddress = new();
     private int? _selectedCustomerId;
+    public event EventHandler<int>? CustomerAdded;
 
     public CustomersForm()
     {
@@ -257,9 +258,10 @@ public sealed class CustomersForm : Form
 
         try
         {
-            _customerService.AddCustomer(fullName, phone, email, idNumber, address);
+            var customerId = _customerService.AddCustomer(fullName, phone, email, idNumber, address);
             LoadCustomers();
             ClearForm();
+            CustomerAdded?.Invoke(this, customerId);
         }
         catch (Exception ex)
         {

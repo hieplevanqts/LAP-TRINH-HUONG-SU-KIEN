@@ -16,13 +16,14 @@ ORDER BY CustomerId DESC;";
         return Db.ExecuteQuery(sql);
     }
 
-    public void AddCustomer(string fullName, string? phone, string? email, string? idNumber, string? address)
+    public int AddCustomer(string fullName, string? phone, string? email, string? idNumber, string? address)
     {
         const string sql = @"
 INSERT INTO Customers (FullName, Phone, Email, IdNumber, Address)
-VALUES (@FullName, @Phone, @Email, @IdNumber, @Address);";
+VALUES (@FullName, @Phone, @Email, @IdNumber, @Address);
+SELECT SCOPE_IDENTITY();";
 
-        Db.ExecuteNonQuery(
+        var result = Db.ExecuteScalar(
             sql,
             new SqlParameter("@FullName", fullName),
             new SqlParameter("@Phone", (object?)phone ?? DBNull.Value),
@@ -30,6 +31,8 @@ VALUES (@FullName, @Phone, @Email, @IdNumber, @Address);";
             new SqlParameter("@IdNumber", (object?)idNumber ?? DBNull.Value),
             new SqlParameter("@Address", (object?)address ?? DBNull.Value)
         );
+
+        return Convert.ToInt32(result);
     }
 
     public void UpdateCustomer(int customerId, string fullName, string? phone, string? email, string? idNumber, string? address)

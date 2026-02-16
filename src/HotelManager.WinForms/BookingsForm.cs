@@ -8,6 +8,8 @@ namespace HotelManager.WinForms;
 
 public sealed class BookingsForm : Form
 {
+    public event EventHandler? BookingCreated;
+
     private readonly BookingService _bookingService = new();
     private readonly ServiceService _serviceService = new();
     private readonly Guna2ComboBox _cbCustomer = new();
@@ -244,6 +246,33 @@ public sealed class BookingsForm : Form
         }
     }
 
+    public void RefreshCustomersAndSelect(int customerId)
+    {
+        LoadCustomers();
+
+        if (_cbCustomer.DataSource is not DataTable table || table.Rows.Count == 0)
+        {
+            _cbCustomer.Focus();
+            return;
+        }
+
+        for (var i = 0; i < table.Rows.Count; i++)
+        {
+            var id = Convert.ToInt32(table.Rows[i]["CustomerId"]);
+            if (id != customerId)
+            {
+                continue;
+            }
+
+            _cbCustomer.SelectedValue = customerId;
+            _cbCustomer.SelectedIndex = i;
+            break;
+        }
+
+        _cbCustomer.Focus();
+        _cbCustomer.DroppedDown = true;
+    }
+
     private void LoadRooms()
     {
         _roomsList.Items.Clear();
@@ -436,6 +465,7 @@ public sealed class BookingsForm : Form
             LoadRooms();
             _selectedServices.Clear();
             RefreshSelectedServicesList();
+            BookingCreated?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)
         {

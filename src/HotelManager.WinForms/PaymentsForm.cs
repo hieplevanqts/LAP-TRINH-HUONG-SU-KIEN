@@ -768,6 +768,18 @@ public sealed class PaymentsForm : Form
             return;
         }
 
+        var confirmation = BuildPaymentConfirmationMessage();
+        var confirmResult = MessageBox.Show(
+            confirmation,
+            "Xác nhận thanh toán",
+            MessageBoxButtons.OKCancel,
+            MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button2);
+        if (confirmResult != DialogResult.OK)
+        {
+            return;
+        }
+
         try
         {
             _paymentService.PayBooking(
@@ -788,6 +800,66 @@ public sealed class PaymentsForm : Form
         {
             MessageBox.Show($"Thanh toán thất bại: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    private string BuildPaymentConfirmationMessage()
+    {
+        var bookingIdText = _selectedBookingId?.ToString() ?? string.Empty;
+        var customerName = string.Empty;
+        var checkInText = string.Empty;
+        var checkOutText = string.Empty;
+
+        if (_grid.CurrentRow?.DataBoundItem is DataRowView rowView)
+        {
+            var row = rowView.Row;
+            customerName = row["FullName"]?.ToString() ?? string.Empty;
+
+            if (row.Table.Columns.Contains("CheckInDate") && row["CheckInDate"] != DBNull.Value)
+            {
+                checkInText = Convert.ToDateTime(row["CheckInDate"]).ToString("dd/MM/yyyy");
+            }
+
+            if (row.Table.Columns.Contains("CheckOutDate") && row["CheckOutDate"] != DBNull.Value)
+            {
+                checkOutText = Convert.ToDateTime(row["CheckOutDate"]).ToString("dd/MM/yyyy");
+            }
+        }
+
+        var methodDisplay = _cbMethod.SelectedItem is PaymentMethodOption methodOption
+            ? methodOption.Display
+            : "Tiền mặt";
+        var discount = _numDiscount.Value;
+        var tax = _numTax.Value;
+        var total = _currentSubtotal - discount + tax;
+        if (total < 0)
+        {
+            total = 0;
+        }
+
+        var serviceLines = _selectedServicesList.Items
+            .OfType<ServiceUsageDisplay>()
+            .Select(s => $"- {s.ServiceName} x {s.Quantity}: {FormatMoney(s.Amount)}")
+            .ToList();
+
+        var servicesText = serviceLines.Count == 0
+            ? "Không có dịch vụ phát sinh."
+            : string.Join(Environment.NewLine, serviceLines);
+
+        var note = string.IsNullOrWhiteSpace(_txtNote.Text) ? "Không có" : _txtNote.Text.Trim();
+
+        return
+            $"Mã đặt phòng: #{bookingIdText}{Environment.NewLine}" +
+            $"Khách hàng: {customerName}{Environment.NewLine}" +
+            $"Thời gian thuê: {checkInText} - {checkOutText}{Environment.NewLine}" +
+            $"Thu ngân: {_loginInfo.FullName}{Environment.NewLine}{Environment.NewLine}" +
+            $"Dịch vụ:{Environment.NewLine}{servicesText}{Environment.NewLine}{Environment.NewLine}" +
+            $"Tạm tính: {FormatMoney(_currentSubtotal)}{Environment.NewLine}" +
+            $"Giảm giá: {FormatMoney(discount)}{Environment.NewLine}" +
+            $"Thuế: {FormatMoney(tax)}{Environment.NewLine}" +
+            $"Tổng thanh toán: {FormatMoney(total)}{Environment.NewLine}" +
+            $"Phương thức: {methodDisplay}{Environment.NewLine}" +
+            $"Ghi chú: {note}{Environment.NewLine}{Environment.NewLine}" +
+            "Nhấn OK để xác nhận thanh toán hoặc Cancel để hủy.";
     }
 
     private static string MapBookingStatus(string? status)
